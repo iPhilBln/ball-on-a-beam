@@ -51,34 +51,36 @@
         N & operator = (const N &); //Verhindert weitere Instanz durch Kopie
     };
 
+
+    enum class ENGINE_DIRECTION {
+        undefined,
+        cw,
+        ccw
+    };
+
+    enum class ENGINE_STEP_MODE {
+        halfstep,
+        fullstep
+    };
+
     class STEPPER_ENGINE {
-        private:        
-            enum class ENGINE_DIRECTION {
-                undefined,
-                cw,
-                ccw
-            };
+        private:   
+            static STEPPER_ENGINE& getInstanceIsr(void);     
             
-            enum class ENGINE_STEP_MODE {
-                halfstep,
-                fullstep
-            };
+            inline  static bool     _instanceCreated = false;
 
-            ENGINE_DIRECTION        _direction_helper = ENGINE_DIRECTION::undefined;
-            
-            static      STEPPER_ENGINE* isrInstance; // statisches Mitglied als Zeiger auf die aktuelle Instanz
-
+            volatile    ENGINE_DIRECTION _direction; 
                         int32_t     _degree_target;
                         int32_t     _degree_target_max;
                         uint16_t    _rpm_min;
                         uint16_t    _rpm_max;
-                        bool        _step_mode;             // true: halfstep | false: fullstep
+                        ENGINE_STEP_MODE _step_mode;             // true: halfstep | false: fullstep
                         uint16_t    _steps_per_revolution;
             
             volatile    int32_t     _degree_actual;
                         uint16_t    _timer_prescaler;
-                        uint16_t    _rpm_actual;
-                        uint8_t     _rpm_counter;
+            volatile    uint16_t    _rpm_actual;
+            volatile    uint8_t     _rpm_counter;
                         uint16_t    _degree_per_step;
             volatile    uint8_t     _step_counter;
 
@@ -86,48 +88,48 @@
                     void    setDegreeActual(int32_t degree_actual);
                     void    setRpmActual(void);
                     void    setDegreePerStep(uint16_t degree_per_step);
-                    void    setStepMode(bool step_mode);
+                    void    setStepMode(ENGINE_STEP_MODE step_mode);
+                    void    setDirection(ENGINE_DIRECTION direction);
                     
-                    void    turn_cw(void);
-                    void    turn_ccw(void);        
+                    void    move(void);       
                     void    startTimerEngine(void);
                     void    stopTimerEngine(void); 
 
-            static  void    isrSetDegreeActual(void)  __asm__("__vector_17") __attribute__((__signal__, __used__, __externally_visible__)); // Timer/Counter1 Compare Match A 
+            static  void    isrSetEngine(void)  __asm__("__vector_17") __attribute__((__signal__, __used__, __externally_visible__)); // Timer/Counter1 Compare Match A 
+            
+            // Meyers Singleton Constructor
+            STEPPER_ENGINE() {}
+            ~STEPPER_ENGINE() {}
+            
+            STEPPER_ENGINE(const STEPPER_ENGINE&) = delete;
+            STEPPER_ENGINE& operator = (const STEPPER_ENGINE&) = delete;
         public:
-            // Constructor
-            STEPPER_ENGINE(bool step_mode = true);
-            STEPPER_ENGINE(uint16_t steps_per_revolution, bool step_mode = true);
-            STEPPER_ENGINE(uint16_t rpm_min, uint16_t rpm_max, uint16_t steps_per_revolution, bool step_mode = true);
-
-            // SETTER and GETTER
-            float       getDegreeActual(void);
-
-            void        setDegreeTargetMax(float degree_target_max);
-            float       getDegreeTargetMax(void);
-
-            void        setDegreeTarget(float degree_target);
-            float       getDegreeTarget(void);
-
-            uint16_t    getRpmActual(void);
-
-            void        setRpmMin(uint16_t rpm_min);
-            uint16_t    getRpmMin(void);
-
-            void        setRpmMax(uint16_t rpm_max);
-            uint16_t    getRpmMax(void);
-
-            void        setStepsPerRevolution(uint16_t steps_per_revolution);
-            uint16_t    getStepsPerRevolution(void);
-
-            float       getDegreePerStep(void);
+            static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep);
+            static STEPPER_ENGINE& getInstance(uint16_t steps_per_revolution, ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep);
+            static STEPPER_ENGINE& getInstance(uint16_t rpm_min, uint16_t rpm_max, uint16_t steps_per_revolution, ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep);
 
             
-            bool        getStepMode(void);
+
+            // SETTER
+            void        setDegreeTargetMax(float degree_target_max);
+            void        setDegreeTarget(float degree_target, bool reset = false);
+            void        setRpmMin(uint16_t rpm_min);
+            void        setRpmMax(uint16_t rpm_max);
+            void        setStepsPerRevolution(uint16_t steps_per_revolution);
+            
+            // GETTER
+            float               getDegreeActual(void) const;
+            float               getDegreeTarget(void) const;
+            float               getDegreeTargetMax(void) const;
+            uint16_t            getRpmActual(void) const;
+            uint16_t            getRpmMin(void) const;
+            uint16_t            getRpmMax(void) const;
+            uint16_t            getStepsPerRevolution(void) const;
+            float               getDegreePerStep(void) const;
+            ENGINE_STEP_MODE    getStepMode(void) const;
 
             // aditional functions
             void        begin(void);
             void        stop(void);
     };
-
 #endif
