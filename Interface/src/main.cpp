@@ -1,18 +1,22 @@
-#include <Arduino.h>
 
-// put function declarations here:
-int myFunction(int, int);
+#include "common.h"
+#include "avr8-stub.h"
+#include "app_api.h"  //only needed with flash breakpoints
+
+#define button 50
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  //initialize GDB stub
+  //debug_init();
+
+  Serial.begin(115200);
+  delay(500);
+  pinMode(button, INPUT);
+
+  Serial.println("Start");
+
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+  
 }
