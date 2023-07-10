@@ -102,11 +102,7 @@
             STEPPER_ENGINE(const STEPPER_ENGINE&) = delete;
             STEPPER_ENGINE& operator = (const STEPPER_ENGINE&) = delete;
         public:
-            //static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep);
-            //static STEPPER_ENGINE& getInstance(uint16_t steps_per_revolution, ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep);
             static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 30, uint16_t rpm_max = 200, uint16_t steps_per_revolution = 200);
-
-            
 
             // SETTER
             void    setDegreeTargetMax(float degree_target_max);

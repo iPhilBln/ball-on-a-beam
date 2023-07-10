@@ -4,40 +4,6 @@
 
 /*      CONSTRUCTORS        */
 
-/*
-STEPPER_ENGINE& STEPPER_ENGINE::getInstance(ENGINE_STEP_MODE step_mode) {  
-    static STEPPER_ENGINE _instance;
-
-    if (_instanceCreated == false) {
-        _instance.setDegreeTargetMax(45.0);
-        _instance.setDegreeTarget(0.0);
-        _instance.setStepMode(step_mode);
-        _instance.setStepsPerRevolution(200); 
-        _instance.setRpmMin(30);
-        _instance.setRpmMax(200);
-
-        _instanceCreated = true;
-    }
-
-    return _instance;
-}
-
-STEPPER_ENGINE& STEPPER_ENGINE::getInstance(uint16_t steps_per_revolution, ENGINE_STEP_MODE step_mode) {
-    static STEPPER_ENGINE _instance;
-
-    if (_instanceCreated == false) {
-        _instance.setDegreeTargetMax(45.0);
-        _instance.setDegreeTarget(0.0);
-        _instance.setStepMode(step_mode);
-        _instance.setStepsPerRevolution(steps_per_revolution);
-        _instance.setRpmMin(30);
-        _instance.setRpmMax(200);
-
-        _instanceCreated = true;
-    }
-    return _instance;  
-}
-*/
 STEPPER_ENGINE& STEPPER_ENGINE::getInstance(ENGINE_STEP_MODE step_mode, uint16_t rpm_min, uint16_t rpm_max, uint16_t steps_per_revolution) {
     static STEPPER_ENGINE _instance;
 
