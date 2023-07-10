@@ -1,4 +1,3 @@
-#include "common.h"
 #include "HC_SR04.h"
 
 #define button 50
