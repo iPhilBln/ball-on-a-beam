@@ -33,15 +33,6 @@ void       STEPPER_ENGINE::setDegreeActual(bool reset) {
         case ENGINE_DIRECTION::cw  : _degree_actual -= _degree_per_step;   break;
         default: break;
     }
-
-    // muss noch getestet werden ob notwendig
-    /*
-    if (_degree_target == 0) {
-        if (- _degree_per_step / 2 <= _degree_actual && _degree_actual <= _degree_per_step / 2) {
-            _degree_actual = 0;
-        }        
-    }
-    */
 }
 
 void        STEPPER_ENGINE::setRpmActual(void) {
