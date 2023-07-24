@@ -1,6 +1,6 @@
 #ifndef HC_SR04_H_
 #define HC_SR04_H_
-    #include "common.h"
+    #include <Arduino.h>
 
     /**
     * ultrasonic sensor echo left     = D49 / L0  -> ICP4
@@ -31,14 +31,17 @@
                                 uint8_t     _ball_radius;
                                 uint8_t     _timer_prescaler;
 
-            static  volatile    uint16_t    _echo_counter;
-            static  volatile    bool        _echo_timeout;
+            inline  static  volatile    uint16_t    _echo_counter_left;
+            inline  static  volatile    uint16_t    _echo_counter_right;
+            inline  static  volatile    bool        _echo_timeout;
 
                                 uint8_t     _offset_left;
                                 uint16_t    _distance_left;
 
                                 uint8_t     _offset_right;
                                 uint16_t    _distance_right;
+
+                                uint16_t    _distance;
 
                     void    setOffsetLeft(void);
                     void    setOffsetRight(void);
@@ -77,6 +80,8 @@
 
             uint16_t getDistanceSensorLeft(void);
             uint16_t getDistanceSensorRight(void);
+
+            uint16_t getDistance(void);
 
             void beginSensorLeft(void);
             void beginSensorRight(void);
