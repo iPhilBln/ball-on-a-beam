@@ -1,6 +1,5 @@
 #ifndef STEPPER_ENGINE_H_INCLUDED
 #define STEPPER_ENGINE_H_INCLUDED
-    //#include "common.h"
     #include <Arduino.h>
     
     /**
@@ -36,21 +35,6 @@
     #define H_L1CCW_L2OFF()   PORTA &= ~( _BV(PA2) | _BV(PA4) | _BV(PA5) ); PORTA |= _BV(PA3)
     #define H_L1CCW_L2CCW()   PORTA &= ~( _BV(PA2) | _BV(PA4) );            PORTA |= _BV(PA3) | _BV(PA5)
     #define H_L1OFF_L2CCW()   PORTA &= ~( _BV(PA2) | _BV(PA3) | _BV(PA4) ); PORTA |= _BV(PA5)
-
-    class N {
-    public:
-        static N& instance() {
-            static N _instance;
-            return _instance;
-        }
-        ~N() {}
-        void xyz();
-    private:
-        N() {}                      // verhindert, dass ein Objekt von außerhalb von N erzeugt wird.
-                                    // protected, wenn man von der Klasse noch erben möchte
-        N( const N& );              /* verhindert, dass eine weitere Instanz via Kopier-Konstruktor erstellt werden kann */
-        N & operator = (const N &); //Verhindert weitere Instanz durch Kopie
-    };
 
 
     enum class ENGINE_DIRECTION {
