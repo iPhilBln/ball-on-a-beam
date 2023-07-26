@@ -66,6 +66,8 @@
                         uint16_t         _degree_per_step;
             volatile    uint8_t          _step_counter;
 
+                        float            _kp;
+                        float            _ki;
 
                     void    setDegreeActual(bool reset = false);
                     void    setRpmActual(void);
@@ -86,7 +88,7 @@
             STEPPER_ENGINE(const STEPPER_ENGINE&) = delete;
             STEPPER_ENGINE& operator = (const STEPPER_ENGINE&) = delete;
         public:
-            static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 30, uint16_t rpm_max = 200, uint16_t steps_per_revolution = 200);
+            static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 3, uint16_t rpm_max = 200, uint16_t steps_per_revolution = 200);
 
             // SETTER
             void    setDegreeTargetMax(float degree_target_max);
@@ -94,8 +96,11 @@
             void    setRpmMin(uint16_t rpm_min);
             void    setRpmMax(uint16_t rpm_max);
             void    setStepsPerRevolution(uint16_t steps_per_revolution);
+            void    setKp(float kp);
+            void    setKi(float ki);
             
             // GETTER
+            bool                getState(void) const;
             float               getDegreeActual(void) const;
             float               getDegreeTarget(void) const;
             float               getDegreeTargetMax(void) const;
@@ -106,7 +111,7 @@
             float               getDegreePerStep(void) const;
             ENGINE_STEP_MODE    getStepMode(void) const;
 
-            // aditional functions
+            // FUNCTIONS
             void        begin(void);
             void        stop(void);
     };

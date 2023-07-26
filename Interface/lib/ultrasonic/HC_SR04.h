@@ -1,6 +1,7 @@
 #ifndef HC_SR04_H_
 #define HC_SR04_H_
     #include <Arduino.h>
+    #include "STEPPER_ENGINE.h"
 
     /**
     * ultrasonic sensor echo left     = D49 / L0  -> ICP4
@@ -26,22 +27,26 @@
 
     class HC_SR04 {
         private:
-                                double      _temperature;
-                                double      _ultrasonic_speed;
-                                uint8_t     _ball_radius;
-                                uint8_t     _timer_prescaler;
+            inline  static  bool    _instanceCreated = false;
 
-            inline  static  volatile    uint16_t    _echo_counter_left;
-            inline  static  volatile    uint16_t    _echo_counter_right;
-            inline  static  volatile    bool        _echo_timeout;
+                        double      _temperature;
+                        double      _ultrasonic_speed;
+                        uint8_t     _ball_radius;
+                        uint8_t     _timer_prescaler;
 
-                                uint8_t     _offset_left;
-                                uint16_t    _distance_left;
+            inline  static  volatile    uint16_t    _echo_counter_left  = 0;
+            inline  static  volatile    uint16_t    _echo_counter_right = 0;
+            inline  static  volatile    bool        _echo_timeout       = false;
 
-                                uint8_t     _offset_right;
-                                uint16_t    _distance_right;
+                        uint8_t     _offset_left;
+                        uint16_t    _distance_left;
 
-                                uint16_t    _distance;
+                        uint8_t     _offset_right;
+                        uint16_t    _distance_right;
+
+                        uint16_t    _distance;
+
+            STEPPER_ENGINE& stepper = STEPPER_ENGINE::getInstance();
 
                     void    setOffsetLeft(void);
                     void    setOffsetRight(void);
@@ -58,11 +63,20 @@
             static  void    isrEchoRightCapture(void) __asm__("__vector_46") __attribute__((__signal__, __used__, __externally_visible__)); // Timer/Counter5 Capture Event
             static  void    isrEchoRightTimeout(void) __asm__("__vector_47") __attribute__((__signal__, __used__, __externally_visible__)); // Timer/Counter5 Compare Match A 
             
+
+            // Meyers Singleton Constructor
+            HC_SR04() {}
+            ~HC_SR04() {}
+            
+            HC_SR04(const HC_SR04&) = delete;
+            HC_SR04& operator = (const HC_SR04&) = delete;            
+        
         public:
-            HC_SR04();
-            HC_SR04(uint8_t ball_radius, uint8_t timer_prescaler = 1);
-            HC_SR04(double  temperature, uint8_t timer_prescaler = 1);
-            HC_SR04(uint8_t ball_radius, double  temperature, uint8_t timer_prescaler = 1);
+            static HC_SR04& getInstance(uint8_t ball_radius = 20, double  temperature = 20.0, uint8_t timer_prescaler = 1);
+            //HC_SR04();
+            //HC_SR04(uint8_t ball_radius, uint8_t timer_prescaler = 1);
+            //HC_SR04(double  temperature, uint8_t timer_prescaler = 1);
+            //HC_SR04(uint8_t ball_radius, double  temperature, uint8_t timer_prescaler = 1);
 
             double  getUltrasonicSpeed(void);
 
@@ -83,6 +97,7 @@
 
             uint16_t getDistance(void);
 
+            void beginUltrasonic(void);
             void beginSensorLeft(void);
             void beginSensorRight(void);
     };

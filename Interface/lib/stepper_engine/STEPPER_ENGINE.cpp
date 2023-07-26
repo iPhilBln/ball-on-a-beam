@@ -33,6 +33,18 @@ void       STEPPER_ENGINE::setDegreeActual(bool reset) {
         case ENGINE_DIRECTION::cw  : _degree_actual -= _degree_per_step;   break;
         default: break;
     }
+/*
+    // PI implementation
+    double dt = OCR1A * _timer_prescaler / F_CPU;
+    int32_t error = _degree_target - _degree_actual;
+
+    double pPart = _kp * error;
+    double iPart = _ki * error * dt;
+
+    Serial.print(pPart + iPart, 4);
+    _degree_actual = static_cast<uint16_t>(pPart + iPart);
+    Serial.println("\t" + String(_degree_actual));
+*/
 }
 
 void        STEPPER_ENGINE::setRpmActual(void) {
@@ -134,7 +146,7 @@ void        STEPPER_ENGINE::stopTimerEngine(void) {
 }
 
 void        STEPPER_ENGINE::isrMoveEngine(void) {
-    if (_instanceCreated) {
+    if (STEPPER_ENGINE::_instanceCreated) {
         STEPPER_ENGINE& _instance = STEPPER_ENGINE::getInstance();
         
         if (_instance._degree_actual < (_instance._degree_target - _instance._degree_per_step / 2)) {
@@ -204,8 +216,18 @@ void        STEPPER_ENGINE::setStepsPerRevolution(uint16_t steps_per_revolution)
     setDegreePerStep(_steps_per_revolution);
 }
 
+void   STEPPER_ENGINE::setKp(float kp) {
+    _kp = kp;
+}
+
+void   STEPPER_ENGINE::setKi(float ki) {
+    _ki = ki;
+}
 
 // GETTER
+bool        STEPPER_ENGINE::getState(void) const {
+    return TCCR1B & (_BV(CS12) | _BV(CS11) | _BV(CS10));
+}
 
 float      STEPPER_ENGINE::getDegreeActual(void) const {
     return static_cast<float>(_degree_actual / 1000.0);   
@@ -253,15 +275,20 @@ void        STEPPER_ENGINE::begin(void) {
     TCCR1A = 0; // set entire TCCR1A register to 0
     TCCR1B = 0; // set entire TCCR1B register to 0
 
-    TCCR1B = _BV(WGM12);   // enable Clear Timer on Compare immedately for OCR1A
-    TIMSK1 = _BV(OCIE1A);  // enable timer 1 compare interrupt
+    TCCR1B = _BV(WGM12);   // enable Clear Timer on Compare immedately 
+    TIMSK1 = _BV(OCIE1A);  // enable timer 1 compare interrupt for OCR1A
 
+
+    double   kp = _kp;
+    double   ki = _ki;
     float    degree_max_local = getDegreeTargetMax();
     uint16_t rpm_max_local    = getRpmMax();
     uint32_t counter_steps    = 0;
 
+    setKp(1.0);
+    setKi(0.0);
     setDegreeTargetMax(360.0);
-    setRpmMax(_rpm_min);
+    setRpmMax(100);
 
     setDegreeActual(true);
 
@@ -270,7 +297,7 @@ void        STEPPER_ENGINE::begin(void) {
         while (_degree_actual != _degree_target) {}
     }
 
-    while (TCCR1B & (_BV(CS12) | _BV(CS11) | _BV(CS10))) {}
+    while (getState()) {}
 
     while (CHECK_END_POSITION_RIGHT()) {
         counter_steps++;
@@ -278,18 +305,19 @@ void        STEPPER_ENGINE::begin(void) {
         while (_degree_actual != _degree_target) {}
     }
 
-    while (TCCR1B & (_BV(CS12) | _BV(CS11) | _BV(CS10))) {}
+    while (getState()) {}
 
     for (uint16_t i = 0; i < counter_steps / 2; i++) {
         setDegreeTarget(static_cast<float>((_degree_actual + _degree_per_step) / 1000.0));
         while (_degree_actual != _degree_target) {}
     }
 
-    while (TCCR1B & (_BV(CS12) | _BV(CS11) | _BV(CS10))) {}
+    while (getState()) {}
 
     Serial.println("Finished initialization!");
 
-
+    setKp(kp);
+    setKi(ki);
     setDegreeActual(true);
     setDegreeTargetMax(degree_max_local);
     setRpmMax(rpm_max_local);
