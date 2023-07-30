@@ -1,6 +1,6 @@
 #include "PID.h"
 
-double mapd(double x, double in_min, double in_max, double out_min, double out_max) {
+float mapf(float x, float in_min, float in_max, float out_min, float out_max) {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
@@ -130,9 +130,9 @@ void CONTROLLER::runStepresponseClosedLoop(uint16_t setpoint) {
         //double ki = static_cast<double>(1.0 * analogRead(A1));
         //double kd = static_cast<double>(1.0 * analogRead(A2));
 
-        kp = mapd(kp, 0, 1023, 0.0, 100.0);
-        ki = mapd(ki, 0, 1023, 0.0, 100.0);
-        kd = mapd(kd, 0, 1023, 0.0, 100.0);
+        kp = mapf(kp, 0, 1023, 0.0, 100.0);
+        ki = mapf(ki, 0, 1023, 0.0, 100.0);
+        kd = mapf(kd, 0, 1023, 0.0, 100.0);
 
         Serial.println(String(kp,3) + "\t" + String(ki,3) + "\t" +String(kd,3));
 
@@ -169,7 +169,7 @@ void CONTROLLER::runStepresponseClosedLoop(uint16_t setpoint) {
         if (sum > 450.0)  sum = 450.0;
         if (sum < -450.0) sum = -450.0;
 
-        sum = mapd(sum, -450.0, 450.0, 45.0, -45.0);
+        sum = mapf(sum, -450.0, 450.0, 45.0, -45.0);
 
         stepper.setDegreeTarget(sum);
         
@@ -226,4 +226,19 @@ void CONTROLLER::runStepresponseOpenLoop(float step) {
         while (stepper.getState()) {}
     }
 
+}
+
+void CONTROLLER::testEngine(void) {
+    while (true) {
+        int val = analogRead(A7);
+        float freq = mapf(1.0 * val, 0.0, 1023.0, 0.0, 150.0);
+        STEPPER_ENGINE& stepper = STEPPER_ENGINE::getInstance();
+        stepper.setFreq(freq);
+        int32_t degree = static_cast<int32_t>(1000 * stepper.getDegreeActual());
+        uint32_t rpm   = static_cast<uint32_t>(1000 * stepper.getFreq());
+
+        Serial2.write((byte *) &degree, sizeof(int32_t));
+        Serial3.write((byte *) &rpm, sizeof(uint32_t));
+        while(_running) {}
+    }
 }

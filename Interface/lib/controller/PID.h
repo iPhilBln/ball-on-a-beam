@@ -1,5 +1,5 @@
-#ifndef CONTROLLER_H_
-#define CONTROLLER_H_
+#ifndef PID_H_
+#define PID_H_
 
 #include <Arduino.h>
 #include "STEPPER_ENGINE.h"
@@ -82,6 +82,7 @@ class CONTROLLER {
 
         void runStepresponseOpenLoop(float step);
         void runStepresponseClosedLoop(uint16_t setpoint);
+        void testEngine(void);
 };
 
 #endif

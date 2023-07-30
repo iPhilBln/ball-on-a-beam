@@ -20,6 +20,9 @@
     // define GPIO pins for engine as output
     #define SET_GPIO_DIRECTION_ENGINE()  DDRA |= _BV(PA2) | _BV(PA3) | _BV(PA4) | _BV(PA5)
 
+    // define GPIO register for stop the engine
+    #define STOP_ENGINE()     PORTA &= ~( _BV(PA2) | _BV(PA3) | _BV(PA4) | _BV(PA5) );
+
     // define GPIO register for left and right direction : FULLSTEP
     #define F_L1CW_L2CCW()    PORTA &= ~( _BV(PA3) | _BV(PA4) ); PORTA |= _BV(PA2) | _BV(PA5) 
     #define F_L1CW_L2CW()     PORTA &= ~( _BV(PA3) | _BV(PA5) ); PORTA |= _BV(PA2) | _BV(PA4) 
@@ -66,18 +69,23 @@
                         uint16_t         _degree_per_step;
             volatile    uint8_t          _step_counter;
 
-                        float            _kp;
-                        float            _ki;
+                        bool             _setPosition;
+                        uint16_t         _ocr;
+                        float            _freq;
 
                     void    setDegreeActual(bool reset = false);
                     void    setRpmActual(void);
                     void    setDegreePerStep(uint16_t steps_per_revolution);
                     void    setStepMode(ENGINE_STEP_MODE step_mode);
                     void    setDirection(ENGINE_DIRECTION direction);
+                    void    setPrescaler(float freq = 1.0);
+                    void    setOCR(uint16_t ocr);
+                    void    setPosition(bool setPosition);
                     
                     void    move(void);       
                     void    startTimerEngine(void);
                     void    stopTimerEngine(void); 
+                    //void    computeFreq(void);
 
             static  void    isrMoveEngine(void)  __asm__("__vector_17") __attribute__((__signal__, __used__, __externally_visible__)); // Timer/Counter1 Compare Match A 
             
@@ -88,7 +96,7 @@
             STEPPER_ENGINE(const STEPPER_ENGINE&) = delete;
             STEPPER_ENGINE& operator = (const STEPPER_ENGINE&) = delete;
         public:
-            static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 3, uint16_t rpm_max = 200, uint16_t steps_per_revolution = 200);
+            static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 3, uint16_t rpm_max = 120, uint16_t steps_per_revolution = 200);
 
             // SETTER
             void    setDegreeTargetMax(float degree_target_max);
@@ -96,14 +104,14 @@
             void    setRpmMin(uint16_t rpm_min);
             void    setRpmMax(uint16_t rpm_max);
             void    setStepsPerRevolution(uint16_t steps_per_revolution);
-            void    setKp(float kp);
-            void    setKi(float ki);
+            void    setFreq(float freq);
             
             // GETTER
             bool                getState(void) const;
             float               getDegreeActual(void) const;
             float               getDegreeTarget(void) const;
             float               getDegreeTargetMax(void) const;
+            float               getFreq(void) const;
             uint16_t            getRpmActual(void) const;
             uint16_t            getRpmMin(void) const;
             uint16_t            getRpmMax(void) const;

@@ -8,12 +8,13 @@ STEPPER_ENGINE& STEPPER_ENGINE::getInstance(ENGINE_STEP_MODE step_mode, uint16_t
     static STEPPER_ENGINE _instance;
 
     if (_instanceCreated == false) {
+        _instance.setPosition(true);
         _instance.setDegreeTargetMax(45.0);
         _instance.setDegreeTarget(0.0);
         _instance.setStepMode(step_mode);
         _instance.setStepsPerRevolution(steps_per_revolution);
-        _instance.setRpmMin(rpm_min);
         _instance.setRpmMax(rpm_max);
+        _instance.setRpmMin(rpm_min);
 
         _instanceCreated = true;
     }
@@ -33,18 +34,6 @@ void       STEPPER_ENGINE::setDegreeActual(bool reset) {
         case ENGINE_DIRECTION::cw  : _degree_actual -= _degree_per_step;   break;
         default: break;
     }
-/*
-    // PI implementation
-    double dt = OCR1A * _timer_prescaler / F_CPU;
-    int32_t error = _degree_target - _degree_actual;
-
-    double pPart = _kp * error;
-    double iPart = _ki * error * dt;
-
-    Serial.print(pPart + iPart, 4);
-    _degree_actual = static_cast<uint16_t>(pPart + iPart);
-    Serial.println("\t" + String(_degree_actual));
-*/
 }
 
 void        STEPPER_ENGINE::setRpmActual(void) {
@@ -54,27 +43,26 @@ void        STEPPER_ENGINE::setRpmActual(void) {
         if (_rpm_actual < _rpm_max) {
             _rpm_counter++;
         }
-        //Serial.println(1); //Serial.flush();
     }   
     else {
         _rpm_counter = 0;
         direction_local = _direction;
-        //Serial.println(2); //Serial.flush();
     }
     
     _rpm_actual = _rpm_min + 3 * _rpm_counter;
 
-    uint32_t time = 60 * F_CPU / _rpm_actual / _steps_per_revolution / _timer_prescaler - 1;
-    OCR1A = static_cast<uint16_t>(time);
-
+    setPrescaler(1.0 * _rpm_actual);
 }
 
 void        STEPPER_ENGINE::setDegreePerStep(uint16_t steps_per_revolution) {
+    _degree_per_step = static_cast<uint16_t>(360.0 * 1000.0 / steps_per_revolution);
+    /*
     switch (_step_mode) {
-        case ENGINE_STEP_MODE::halfstep : _degree_per_step = static_cast<uint16_t>(360.0 * 1000.0 / steps_per_revolution / 2);  break;
+        case ENGINE_STEP_MODE::halfstep : _degree_per_step = static_cast<uint16_t>(360.0 * 1000.0 / steps_per_revolution);  break;
         case ENGINE_STEP_MODE::fullstep : _degree_per_step = static_cast<uint16_t>(360.0 * 1000.0 / steps_per_revolution);      break;
         default: break;
     }    
+    */
 }
 
 void        STEPPER_ENGINE::setStepMode(ENGINE_STEP_MODE step_mode) {
@@ -83,6 +71,33 @@ void        STEPPER_ENGINE::setStepMode(ENGINE_STEP_MODE step_mode) {
 
 void        STEPPER_ENGINE::setDirection(ENGINE_DIRECTION direction) {
     _direction = direction;
+}
+
+void        STEPPER_ENGINE::setPrescaler(float freq) {
+        uint16_t arr_prescaler[] = {1, 8, 64, 256, 1024};
+        uint8_t  length = sizeof(arr_prescaler) / sizeof(arr_prescaler[0]);
+
+        for (uint8_t i = 0; i < length; i++) {
+            uint32_t ocr_helper = static_cast<uint32_t>(60.0 * F_CPU / freq / _steps_per_revolution / arr_prescaler[i] - 1.0);
+            if (ocr_helper < 0xFFFF) {
+                _timer_prescaler = arr_prescaler[i];
+                setOCR(static_cast<uint16_t>(ocr_helper));
+                break;
+                /*
+                if (_timer_prescaler != arr_prescaler[i]) {
+                    stopTimerEngine();
+                }
+                else if (TCNT1 > freq_helper) {
+                    stopTimerEngine();
+                }
+                
+                setPrescaler(arr_prescaler[i]);
+                setOCR(static_cast<uint16_t>(freq_helper));
+                startTimerEngine();
+                
+                */
+            }
+        }
 }
 
 void        STEPPER_ENGINE::move(void) {
@@ -128,45 +143,58 @@ void        STEPPER_ENGINE::move(void) {
 }  
 
 void        STEPPER_ENGINE::startTimerEngine(void) {
-    TCNT1 = 0;
+    OCR1A = _ocr;
 
     switch (_timer_prescaler)                                       
     {
-        case 1    :  TCCR1B |= _BV(CS10);              break;  // SET CS12 & CS11 & CS10 bit for prescaler 1
-        case 8    :  TCCR1B |= _BV(CS11);              break;  // SET CS12 & CS11 & CS10 bit for prescaler 8  
-        case 64   :  TCCR1B |= _BV(CS11) | _BV(CS10);  break;  // SET CS12 & CS11 & CS10 bit for prescaler 64
-        case 256  :  TCCR1B |= _BV(CS12);              break;  // SET CS12 & CS11 & CS10 bit for prescaler 256
-        case 1024 :  TCCR1B |= _BV(CS12) | _BV(CS10);  break;  // SET CS12 & CS11 & CS10 bit for prescaler 1024
-        default   :  TCCR1B |= _BV(CS11);              break;  // SET CS12 & CS11 & CS10 bit for prescaler 8 
+        case 1    :  TCCR1B |= _BV(CS10);             TCCR1B &= ~( _BV(CS11) | _BV(CS12) ); break;  // SET CS12 & CS11 & CS10 bit for prescaler 1
+        case 8    :  TCCR1B |= _BV(CS11);             TCCR1B &= ~( _BV(CS10) | _BV(CS12) ); break;  // SET CS12 & CS11 & CS10 bit for prescaler 8  
+        case 64   :  TCCR1B |= _BV(CS11) | _BV(CS10); TCCR1B &= ~( _BV(CS12) );             break;  // SET CS12 & CS11 & CS10 bit for prescaler 64
+        case 256  :  TCCR1B |= _BV(CS12);             TCCR1B &= ~( _BV(CS10) | _BV(CS11) ); break;  // SET CS12 & CS11 & CS10 bit for prescaler 256
+        case 1024 :  TCCR1B |= _BV(CS12) | _BV(CS10); TCCR1B &= ~( _BV(CS11) );             break;  // SET CS12 & CS11 & CS10 bit for prescaler 1024
+        default   :  TCCR1B |= _BV(CS11);             TCCR1B &= ~( _BV(CS10) | _BV(CS12) ); break;  // SET CS12 & CS11 & CS10 bit for prescaler 8 
     }
+
+    TCNT1 = 0;
 }
 
 void        STEPPER_ENGINE::stopTimerEngine(void) {
+    TCNT1   = 0;
     TCCR1B &= ~( _BV(CS12) | _BV(CS11) | _BV(CS10) );
 }
 
 void        STEPPER_ENGINE::isrMoveEngine(void) {
     if (STEPPER_ENGINE::_instanceCreated) {
         STEPPER_ENGINE& _instance = STEPPER_ENGINE::getInstance();
-        
-        if (_instance._degree_actual < (_instance._degree_target - _instance._degree_per_step / 2)) {
+        if (_instance._setPosition == false) {
             _instance.setDirection(ENGINE_DIRECTION::ccw);
             _instance.setDegreeActual();
-            _instance.setRpmActual();
             _instance.move();
+            _instance.startTimerEngine();
         }
-        else if (_instance._degree_actual > (_instance._degree_target + _instance._degree_per_step / 2)) {
-            _instance.setDirection(ENGINE_DIRECTION::cw);
-            _instance.setDegreeActual();
-            _instance.setRpmActual();
-            _instance.move();
-        } 
-        else {
-            _instance.setDirection(ENGINE_DIRECTION::undefined);
-            _instance.setDegreeActual();
-            _instance.setRpmActual();
-            _instance.stopTimerEngine();
-        }
+        else {     
+            if (_instance._degree_actual < (_instance._degree_target - _instance._degree_per_step / 2)) {
+                _instance.setDirection(ENGINE_DIRECTION::ccw);
+                _instance.setDegreeActual();
+                _instance.setRpmActual();
+                _instance.move();
+                _instance.startTimerEngine();
+            }
+            else if (_instance._degree_actual > (_instance._degree_target + _instance._degree_per_step / 2)) {
+                _instance.setDirection(ENGINE_DIRECTION::cw);
+                _instance.setDegreeActual();
+                _instance.setRpmActual();
+                _instance.move();
+                _instance.startTimerEngine();
+            } 
+            else {
+                _instance.setDirection(ENGINE_DIRECTION::undefined);
+                _instance.setDegreeActual();
+                _instance.setRpmActual();
+                _instance.setPosition(false);
+                _instance.stopTimerEngine();
+            }
+        }   
     }
 }
 
@@ -180,31 +208,27 @@ void       STEPPER_ENGINE::setDegreeTargetMax(float degree_target_max) {
 }
 
 void        STEPPER_ENGINE::setDegreeTarget(float degree_target) {
+    setPosition(true);
+
     int32_t degree_target_local = static_cast<int32_t>(degree_target * 1000);
 
     if (degree_target_local > _degree_target_max)           _degree_target = _degree_target_max;
     else if (degree_target_local < - _degree_target_max)    _degree_target = - _degree_target_max;
     else                                                    _degree_target = degree_target_local;
-    startTimerEngine();
+    
+    if (getState() == false) {
+        startTimerEngine();
+    }
 }
 
 void        STEPPER_ENGINE::setRpmMin(uint16_t rpm_min) {
+    if (_setPosition == false) return;
+
     stopTimerEngine();
     _rpm_min = rpm_min;
 
-    uint16_t arr_prescaler[] = {1, 8, 64, 256, 1024};
-    uint8_t  length = sizeof(arr_prescaler) / sizeof(arr_prescaler[0]);
-
-    for (uint8_t i = 0; i < length; i++) {
-        uint32_t prescaler_helper = 60 * F_CPU / _rpm_min / _steps_per_revolution / arr_prescaler[i] - 1;
-        if (prescaler_helper < 0xFFFF) {
-            _timer_prescaler = arr_prescaler[i];
-            break;
-        }
-    }
-
-    uint32_t time = 60 * F_CPU / _rpm_min / _steps_per_revolution / _timer_prescaler - 1;
-    OCR1A = static_cast<uint16_t>(time);  
+    setPrescaler(1.0 * _rpm_min);
+    startTimerEngine();
 }
 
 void        STEPPER_ENGINE::setRpmMax(uint16_t rpm_max) {
@@ -212,16 +236,13 @@ void        STEPPER_ENGINE::setRpmMax(uint16_t rpm_max) {
 }
 
 void        STEPPER_ENGINE::setStepsPerRevolution(uint16_t steps_per_revolution) {
-    _steps_per_revolution = steps_per_revolution;
+    switch (_step_mode) {
+        case ENGINE_STEP_MODE::fullstep : _steps_per_revolution = steps_per_revolution;     break;
+        case ENGINE_STEP_MODE::halfstep : _steps_per_revolution = 2 * steps_per_revolution; break;
+        default : _steps_per_revolution = steps_per_revolution;
+    }
+
     setDegreePerStep(_steps_per_revolution);
-}
-
-void   STEPPER_ENGINE::setKp(float kp) {
-    _kp = kp;
-}
-
-void   STEPPER_ENGINE::setKi(float ki) {
-    _ki = ki;
 }
 
 // GETTER
@@ -239,6 +260,10 @@ float      STEPPER_ENGINE::getDegreeTarget(void) const {
 
 float      STEPPER_ENGINE::getDegreeTargetMax(void) const {
     return static_cast<float>(_degree_target_max / 1000.0);
+}
+
+float      STEPPER_ENGINE::getFreq(void) const {
+    return _freq;
 }
 
 uint16_t    STEPPER_ENGINE::getRpmActual(void) const {
@@ -278,21 +303,18 @@ void        STEPPER_ENGINE::begin(void) {
     TCCR1B = _BV(WGM12);   // enable Clear Timer on Compare immedately 
     TIMSK1 = _BV(OCIE1A);  // enable timer 1 compare interrupt for OCR1A
 
-
-    double   kp = _kp;
-    double   ki = _ki;
     float    degree_max_local = getDegreeTargetMax();
     uint16_t rpm_max_local    = getRpmMax();
     uint32_t counter_steps    = 0;
 
-    setKp(1.0);
-    setKi(0.0);
     setDegreeTargetMax(360.0);
-    setRpmMax(100);
+    setRpmMax(50);
 
     setDegreeActual(true);
+    startTimerEngine();
 
     while (CHECK_END_POSITION_LEFT()) {
+        setPosition(true);
         setDegreeTarget(static_cast<float>((_degree_actual + _degree_per_step) / 1000.0));
         while (_degree_actual != _degree_target) {}
     }
@@ -301,6 +323,7 @@ void        STEPPER_ENGINE::begin(void) {
 
     while (CHECK_END_POSITION_RIGHT()) {
         counter_steps++;
+        setPosition(true);
         setDegreeTarget(static_cast<float>((_degree_actual - _degree_per_step) / 1000.0));
         while (_degree_actual != _degree_target) {}
     }
@@ -308,26 +331,59 @@ void        STEPPER_ENGINE::begin(void) {
     while (getState()) {}
 
     for (uint16_t i = 0; i < counter_steps / 2; i++) {
+        setPosition(true);
         setDegreeTarget(static_cast<float>((_degree_actual + _degree_per_step) / 1000.0));
         while (_degree_actual != _degree_target) {}
     }
 
     while (getState()) {}
 
-    Serial.println("Finished initialization!");
 
-    setKp(kp);
-    setKi(ki);
-    setDegreeActual(true);
     setDegreeTargetMax(degree_max_local);
     setRpmMax(rpm_max_local);
+    setDegreeActual(true);
+    Serial.println("Finished initialization!");
 }
 
 void        STEPPER_ENGINE::stop(void) {
     setDegreeTarget(0.0);
 
-    while (TCCR1B & (_BV(CS12) | _BV(CS11) | _BV(CS10))) {};
+    while (getState()) {};
 
     Serial.println("Finish");
 }
 
+void STEPPER_ENGINE::setOCR(uint16_t ocr) {    
+    _ocr = ocr; 
+    Serial.println(String(_freq, 4) + "\t" + String(_timer_prescaler) + "\t" + String(_ocr) + "\t" + String(_degree_actual/1000.0,3));
+}
+
+void STEPPER_ENGINE::setPosition(bool setPosition) {
+    _setPosition = setPosition;
+}
+
+void STEPPER_ENGINE::setFreq(float freq) {
+    if (_setPosition) return;
+
+    _freq = freq;
+
+    if (0.5 < _freq) {
+        setDirection(ENGINE_DIRECTION::ccw);
+        setPrescaler(_freq);
+        if (getState() == false) {
+            startTimerEngine();
+        }
+    }
+    else if (_freq < -0.5) {
+        setDirection(ENGINE_DIRECTION::cw);
+        setPrescaler(-1.0 * _freq);
+        if (getState() == false) {
+            startTimerEngine();
+        }
+    }
+    else {
+        _freq = 0.0;
+        STOP_ENGINE();
+        stopTimerEngine();
+    }
+}
