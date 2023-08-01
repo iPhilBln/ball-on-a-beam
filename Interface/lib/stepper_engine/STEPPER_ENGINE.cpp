@@ -167,7 +167,6 @@ void        STEPPER_ENGINE::isrMoveEngine(void) {
     if (STEPPER_ENGINE::_instanceCreated) {
         STEPPER_ENGINE& _instance = STEPPER_ENGINE::getInstance();
         if (_instance._setPosition == false) {
-            _instance.setDirection(ENGINE_DIRECTION::ccw);
             _instance.setDegreeActual();
             _instance.move();
             _instance.startTimerEngine();
@@ -355,26 +354,32 @@ void        STEPPER_ENGINE::stop(void) {
 
 void STEPPER_ENGINE::setOCR(uint16_t ocr) {    
     _ocr = ocr; 
-    Serial.println(String(_freq, 4) + "\t" + String(_timer_prescaler) + "\t" + String(_ocr) + "\t" + String(_degree_actual/1000.0,3));
+    Serial.println(String(_freq, 4) + "\t" + String(_timer_prescaler) + "\t" + String(_ocr) + "\t" + String(_degree_actual/1000.0, 3));
 }
 
 void STEPPER_ENGINE::setPosition(bool setPosition) {
     _setPosition = setPosition;
 }
 
-void STEPPER_ENGINE::setFreq(float freq) {
+void STEPPER_ENGINE::setFreq(float degree) {
     if (_setPosition) return;
+    static  unsigned    long  t_old = 0;                // old time value in ms
+                        float t_now = micros() / 1000;  // actual timestamp in ms
+                        float t_1   = 100.0;            // T1 in ms
 
-    _freq = freq;
+    float filter_factor = t_1 / (t_now - t_old );
+    t_old = t_now;
 
-    if (0.5 < _freq) {
+    _freq = ((_freq * filter_factor) + degree) / (filter_factor + 1.0);  // compute the angular velocity -> P-T1 element
+
+    if (0.1 < _freq) {
         setDirection(ENGINE_DIRECTION::ccw);
         setPrescaler(_freq);
         if (getState() == false) {
             startTimerEngine();
         }
     }
-    else if (_freq < -0.5) {
+    else if (_freq < -0.1) {
         setDirection(ENGINE_DIRECTION::cw);
         setPrescaler(-1.0 * _freq);
         if (getState() == false) {
