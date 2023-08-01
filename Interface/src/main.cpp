@@ -20,15 +20,14 @@ void setup(void) {
     //debug_init();
 
     Serial.begin(115200);
-    Serial2.begin(9600);
-    Serial3.begin(9600);
+    Serial1.begin(baud_rate_simulink);
+    //Serial1.setTimeout(1);
 
     delay(500);
     pinMode(button, INPUT);
     
     pid.begin();
-    while (digitalRead(button) == HIGH) {}
-    Serial.println("Start Test...");
+    //while (digitalRead(button) == HIGH) {}
     pid.testEngine();
     //HC_SR04&        ultrasonic = HC_SR04::getInstance();
     //ultrasonic.beginUltrasonic();
