@@ -229,16 +229,32 @@ void CONTROLLER::runStepresponseOpenLoop(float step) {
 }
 
 void CONTROLLER::testEngine(void) {
+    Serial.println("Start Test...");
+    setTimer();
+    static float freq = 0.0;
+    
     while (true) {
-        int val = analogRead(A7);
-        float freq = mapf(1.0 * val, 0.0, 1023.0, 0.0, 150.0);
-        STEPPER_ENGINE& stepper = STEPPER_ENGINE::getInstance();
-        stepper.setFreq(freq);
-        int32_t degree = static_cast<int32_t>(1000 * stepper.getDegreeActual());
-        uint32_t rpm   = static_cast<uint32_t>(1000 * stepper.getFreq());
+        _running = true;
 
-        Serial2.write((byte *) &degree, sizeof(int32_t));
-        Serial3.write((byte *) &rpm, sizeof(uint32_t));
+        STEPPER_ENGINE& stepper = STEPPER_ENGINE::getInstance();
+        
+        float freq_temp = recSimu();
+        isnan(freq_temp) ? freq = freq : (-151 < freq_temp && freq_temp < 151 ? freq = freq_temp : freq = freq);
+
+        stepper.setFreq(freq);
+
+        FLOATUNION_t val;
+        val.number[0] = stepper.getFreq();
+        val.number[1] = stepper.getDegreeActual();
+        val.number[2] = 0.0;
+        val.number[3] = 0.0;
+        
+        //transmitFloatToSimulink(degree);
+        //transmitFloatToSimulink(rpm);
+
+        sendSimu(val);
+
         while(_running) {}
     }
+    Serial.println("Ende");
 }

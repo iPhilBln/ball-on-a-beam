@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "STEPPER_ENGINE.h"
 #include "HC_SR04.h"
+#include "simulink_interface.h"
 
 #ifdef __cplusplus
 extern "C" {
