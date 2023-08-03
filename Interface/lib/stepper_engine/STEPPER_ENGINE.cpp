@@ -355,25 +355,29 @@ void STEPPER_ENGINE::setFreq(float degree) {
 
     if (dt == 0.0) return;
 
-    float filter_factor = t_1 / dt;
+    float filter_factor = t_1 / dt; // -> 100ms / 2ms = 50
 
     error = (degree - getDegreeActual()) * p_part;
 
+    // open loop
+    //_freq = ((_freq * filter_factor) + degree) / (filter_factor + 1.0);
+
+    // closed loop
     _freq = ((_freq * filter_factor) + error) / (filter_factor + 1.0);  // compute the angular velocity -> P-T1 element
 
-    if (_freq > 150.0) _freq = 150.0;
-    else if (_freq < -150.0) _freq = -150.0;
+    _freq > 150.0 ? _freq = 150.0 : (_freq < -150.0 ? _freq = -150.0 : _freq = _freq);
 
     //Serial.print(error, 2); Serial.print('\t'); Serial.println(_freq);
     
-    if (0.001 < _freq) {
+    // 0.238Hz max frequency -> PSC:1024 OCR: 0xFFFF | t = 1024 * (0xFFFF + 1) / 16E6
+    if (_freq > 0.24) {
         setDirection(ENGINE_DIRECTION::ccw);
         setPrescaler(_freq);
         if (getState() == false) {
             startTimerEngine();
         }
     }
-    else if (_freq < -0.001) {
+    else if (_freq < -0.24) {
         setDirection(ENGINE_DIRECTION::cw);
         setPrescaler(-1.0 * _freq);
         if (getState() == false) {

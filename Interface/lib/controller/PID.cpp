@@ -227,7 +227,7 @@ void CONTROLLER::runStepresponseOpenLoop(float step) {
 
 void CONTROLLER::testEngine(void) {
     Serial.println("Start Test...");    
-    static float freq = 0.0;
+    static float alpha = 0.0;
     pinMode(8, OUTPUT);
     pinMode(9, OUTPUT);
 
@@ -241,11 +241,11 @@ void CONTROLLER::testEngine(void) {
         val_transmit.number[2] = 0.0;
         val_transmit.number[3] = 0.0;
         
-        float freq_receive = communicationSimulink(val_transmit);
+        float alpha_receive = communicationSimulink(val_transmit);
 
-        isnan(freq_receive) ? freq = freq : (-151 < freq_receive && freq_receive < 151 ? freq = freq_receive : freq = freq);
+        isnan(alpha_receive) ? alpha = alpha : alpha = alpha_receive;
 
-        stepper.setFreq(freq);
+        stepper.setFreq(alpha);
         
         
         //transmitFloatToSimulink(degree);
