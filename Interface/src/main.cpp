@@ -19,9 +19,8 @@ void setup(void) {
      //initialize GDB stub --> Debugger
     //debug_init();
 
-    Serial.begin(115200);
+    Serial.begin(baud_rate_simulink);
     Serial1.begin(baud_rate_simulink);
-    //Serial1.setTimeout(1);
 
     delay(500);
     pinMode(button, INPUT);

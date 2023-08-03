@@ -56,13 +56,6 @@ void        STEPPER_ENGINE::setRpmActual(void) {
 
 void        STEPPER_ENGINE::setDegreePerStep(uint16_t steps_per_revolution) {
     _degree_per_step = static_cast<uint16_t>(360.0 * 1000.0 / steps_per_revolution);
-    /*
-    switch (_step_mode) {
-        case ENGINE_STEP_MODE::halfstep : _degree_per_step = static_cast<uint16_t>(360.0 * 1000.0 / steps_per_revolution);  break;
-        case ENGINE_STEP_MODE::fullstep : _degree_per_step = static_cast<uint16_t>(360.0 * 1000.0 / steps_per_revolution);      break;
-        default: break;
-    }    
-    */
 }
 
 void        STEPPER_ENGINE::setStepMode(ENGINE_STEP_MODE step_mode) {
@@ -83,19 +76,6 @@ void        STEPPER_ENGINE::setPrescaler(float freq) {
                 _timer_prescaler = arr_prescaler[i];
                 setOCR(static_cast<uint16_t>(ocr_helper));
                 break;
-                /*
-                if (_timer_prescaler != arr_prescaler[i]) {
-                    stopTimerEngine();
-                }
-                else if (TCNT1 > freq_helper) {
-                    stopTimerEngine();
-                }
-                
-                setPrescaler(arr_prescaler[i]);
-                setOCR(static_cast<uint16_t>(freq_helper));
-                startTimerEngine();
-                
-                */
             }
         }
 }
@@ -341,6 +321,7 @@ void        STEPPER_ENGINE::begin(void) {
     setDegreeTargetMax(degree_max_local);
     setRpmMax(rpm_max_local);
     setDegreeActual(true);
+    setFreq(0.0);
     Serial.println("Finished initialization!");
 }
 
@@ -363,23 +344,36 @@ void STEPPER_ENGINE::setPosition(bool setPosition) {
 
 void STEPPER_ENGINE::setFreq(float degree) {
     if (_setPosition) return;
-    static  unsigned    long  t_old = 0;                // old time value in ms
-                        float t_now = micros() / 1000;  // actual timestamp in ms
-                        float t_1   = 100.0;            // T1 in ms
+    //static              float freq_old = 0.0;
+    static  unsigned    long  t_old    = 0;                // old time value in ms
+            unsigned    long  t_now    = micros() / 1000;  // actual timestamp in ms
+                        float t_1      = 100.0;            // T1 in ms
+                        float p_part   = 3.0;
+                        float error    = 0.0;           
+    float dt = t_now - t_old;
+    t_old    = t_now;
 
-    float filter_factor = t_1 / (t_now - t_old );
-    t_old = t_now;
+    if (dt == 0.0) return;
 
-    _freq = ((_freq * filter_factor) + degree) / (filter_factor + 1.0);  // compute the angular velocity -> P-T1 element
+    float filter_factor = t_1 / dt;
 
-    if (0.1 < _freq) {
+    error = (degree - getDegreeActual()) * p_part;
+
+    _freq = ((_freq * filter_factor) + error) / (filter_factor + 1.0);  // compute the angular velocity -> P-T1 element
+
+    if (_freq > 150.0) _freq = 150.0;
+    else if (_freq < -150.0) _freq = -150.0;
+
+    //Serial.print(error, 2); Serial.print('\t'); Serial.println(_freq);
+    
+    if (0.001 < _freq) {
         setDirection(ENGINE_DIRECTION::ccw);
         setPrescaler(_freq);
         if (getState() == false) {
             startTimerEngine();
         }
     }
-    else if (_freq < -0.1) {
+    else if (_freq < -0.001) {
         setDirection(ENGINE_DIRECTION::cw);
         setPrescaler(-1.0 * _freq);
         if (getState() == false) {

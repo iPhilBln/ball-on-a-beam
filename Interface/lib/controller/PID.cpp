@@ -19,29 +19,21 @@ CONTROLLER& CONTROLLER::getInstance(SENSOR sensor, float kp, float ki, float kd,
     return _instance;
 }
 
-void CONTROLLER::setTimer(void) {
-
+void CONTROLLER::startTimer(void) {
     TCCR2A = 0;
     TCCR2B = 0;
 
-    TCCR2A |= _BV(WGM21);   // enable Clear Timer on Compare immedately 
-    TIMSK2 |= _BV(OCIE2A);  // enable timer 2 compare interrupt for OCR2A
+    TCCR2A |= _BV(WGM21);   // Enable Clear Timer on Compare immediately 
+    TIMSK2 |= _BV(OCIE2A);  // Enable Timer 2 Compare Interrupt for OCR2A
 
-    if (_sensor == SENSOR::CAPAITY) {
+    // 2ms cycle time -> Prescaler 128
+    OCR2A   = 249;
+    TCCR2B &= ~(_BV(CS22) | _BV(CS21) | _BV(CS20)); // Clear all CS2 bits
+    TCCR2B |= _BV(CS22) | _BV(CS20);                // Set prescaler to 128
+}
 
-    }
-    else if (_sensor == SENSOR::RESISTOR) {
-
-    }
-    else if (_sensor == SENSOR::TOF) {
-
-    }
-    else if (_sensor == SENSOR::ULTRASONIC) {
-        // 11ms cycle time
-        OCR2A   = 171;
-        TCCR2B |= _BV(CS22) | _BV(CS21) | _BV(CS20); // prescaler 1024
-
-    }
+void CONTROLLER::stopTimer(void) {
+    TCCR2B &= ~(_BV(CS22) | _BV(CS21) | _BV(CS20)); // Clear all CS2 bits
 }
 
 void CONTROLLER::isrCycletime(void) {
@@ -85,10 +77,20 @@ float CONTROLLER::getKd(void) {
 
 void CONTROLLER::begin(void) {
     stepper.begin();
+    startTimer();
+
+    Serial1.setTimeout(2);
+    _SERIAL0_SETUP();
+    _SERIAL1_SETUP();
+
+    DDRC |= _BV(PC5);
+    PORTC |= _BV(PC5);
 }
 
 void CONTROLLER::stop(void) {
     stepper.stop();
+    stopTimer();
+    PORTC &= ~( _BV(PC5) );
 }
 
 void CONTROLLER::runPcontroller(void) {
@@ -99,8 +101,6 @@ void CONTROLLER::runPcontroller(void) {
         case SENSOR::ULTRASONIC : break;//ultrasonicPtr = &HC_SR04::getInstance(); break;
         case SENSOR::undefined :  break;
     }
-
-    setTimer();
 
     while (true) {
 
@@ -118,7 +118,6 @@ void CONTROLLER::runStepresponseClosedLoop(uint16_t setpoint) {
     Serial.println("Start");
     HC_SR04&        ultrasonic = HC_SR04::getInstance();
     ultrasonic.beginUltrasonic();
-    setTimer();
 
     while (true) {
         _running = true;
@@ -188,8 +187,6 @@ void CONTROLLER::runStepresponseOpenLoop(float step) {
         case SENSOR::ULTRASONIC : break;// HC_SR04&  sensor = HC_SR04::getInstance();break; //ultrasonicPtr = &HC_SR04::getInstance(); break;
         case SENSOR::undefined :  break;
     }
-
-    setTimer();
     double time;
     uint16_t distance;
 
@@ -229,31 +226,33 @@ void CONTROLLER::runStepresponseOpenLoop(float step) {
 }
 
 void CONTROLLER::testEngine(void) {
-    Serial.println("Start Test...");
-    setTimer();
+    Serial.println("Start Test...");    
     static float freq = 0.0;
-    
+    pinMode(8, OUTPUT);
+    pinMode(9, OUTPUT);
+
     while (true) {
         _running = true;
+        digitalWrite(9, !digitalRead(9));
 
-        STEPPER_ENGINE& stepper = STEPPER_ENGINE::getInstance();
+        FLOATUNION_t val_transmit;
+        val_transmit.number[0] = stepper.getFreq();
+        val_transmit.number[1] = stepper.getDegreeActual();
+        val_transmit.number[2] = 0.0;
+        val_transmit.number[3] = 0.0;
         
-        float freq_temp = recSimu();
-        isnan(freq_temp) ? freq = freq : (-151 < freq_temp && freq_temp < 151 ? freq = freq_temp : freq = freq);
+        float freq_receive = communicationSimulink(val_transmit);
+
+        isnan(freq_receive) ? freq = freq : (-151 < freq_receive && freq_receive < 151 ? freq = freq_receive : freq = freq);
 
         stepper.setFreq(freq);
-
-        FLOATUNION_t val;
-        val.number[0] = stepper.getFreq();
-        val.number[1] = stepper.getDegreeActual();
-        val.number[2] = 0.0;
-        val.number[3] = 0.0;
+        
         
         //transmitFloatToSimulink(degree);
         //transmitFloatToSimulink(rpm);
 
-        sendSimu(val);
-
+        //sendSimu(val_transmit);
+        
         while(_running) {}
     }
     Serial.println("Ende");
