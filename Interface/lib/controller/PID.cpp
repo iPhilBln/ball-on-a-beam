@@ -228,12 +228,16 @@ void CONTROLLER::runStepresponseOpenLoop(float step) {
 void CONTROLLER::testEngine(void) {
     Serial.println("Start Test...");    
     static float alpha = 0.0;
-    pinMode(8, OUTPUT);
-    pinMode(9, OUTPUT);
 
+    while (Serial1.available()) Serial1.read(); // clear Inputbuffer
+    digitalWrite(8, HIGH);
+    pinMode(9, OUTPUT);
+    uint16_t counter = 0;
+    bool display = true;
+    
     while (true) {
         _running = true;
-        digitalWrite(9, !digitalRead(9));
+        digitalWrite(9, HIGH);
 
         FLOATUNION_t val_transmit;
         val_transmit.number[0] = stepper.getFreq();
@@ -242,16 +246,27 @@ void CONTROLLER::testEngine(void) {
         val_transmit.number[3] = 0.0;
         
         float alpha_receive = communicationSimulink(val_transmit);
-
         isnan(alpha_receive) ? alpha = alpha : alpha = alpha_receive;
 
-        stepper.setFreq(alpha);
-        
-        
-        //transmitFloatToSimulink(degree);
-        //transmitFloatToSimulink(rpm);
+        if (alpha_receive > 0.0) {
+            if (counter < 1000) {
+                display = true;
+                //alpha = 60.0;
+                counter++;
+            }
+            else {
+                display = false;
+                alpha = 0.0;
+            }
+        }
+        else {
+            alpha = 0.0;
+            display = false;
+        }
 
-        //sendSimu(val_transmit);
+        stepper.setAlpha(alpha, display);
+
+        digitalWrite(9, LOW);
         
         while(_running) {}
     }

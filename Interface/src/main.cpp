@@ -18,15 +18,18 @@ CONTROLLER& pid = CONTROLLER::getInstance(SENSOR::ULTRASONIC, 1.0 , 0.0, 0.0);
 void setup(void) {
      //initialize GDB stub --> Debugger
     //debug_init();
+    pinMode(8, OUTPUT);
+    digitalWrite(8, LOW);
 
-    Serial.begin(baud_rate_simulink);
+    Serial.begin(1000000);
     Serial1.begin(baud_rate_simulink);
 
     delay(500);
-    pinMode(button, INPUT);
+    pinMode(button, INPUT_PULLUP);
+    
+
     
     pid.begin();
-    //while (digitalRead(button) == HIGH) {}
     pid.testEngine();
     //HC_SR04&        ultrasonic = HC_SR04::getInstance();
     //ultrasonic.beginUltrasonic();

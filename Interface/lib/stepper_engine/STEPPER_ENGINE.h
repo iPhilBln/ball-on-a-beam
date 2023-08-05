@@ -104,7 +104,7 @@
             void    setRpmMin(uint16_t rpm_min);
             void    setRpmMax(uint16_t rpm_max);
             void    setStepsPerRevolution(uint16_t steps_per_revolution);
-            void    setFreq(float degree);
+            void    setAlpha(float degree , bool print);
             
             // GETTER
             bool                getState(void) const;

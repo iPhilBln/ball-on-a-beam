@@ -36,15 +36,15 @@ float recSimu(void) {
 void sendSimu(FLOATUNION_t val_transmit) {
     //Serial1.write(header);
     Serial1.write(val_transmit.buffer, sizeof(val_transmit.buffer));
-    //Serial.println("Gesendet: " + String(val_receive.number[0], 3) +",\t" + String(val_receive.number[1], 3));
+    //Serial.println("Gesendet: " + String(val_transmit.number[0], 3) +",\t" + String(val_transmit.number[1], 3));
     //Serial1.write('\n');
 }
 
 float communicationSimulink(FLOATUNION_t val_transmit) {
     FLOATUNION_t val_receive;
+    size_t input_buffer1_length = Serial1.available();
 
-    if (Serial1.available() >= sizeof(val_receive.number[0]) + 2) {
-        digitalWrite(8, HIGH);
+    if (input_buffer1_length >= sizeof(val_receive.number[0]) + 2) {
         byte data = Serial1.read();
         unsigned long timeout = millis() + 2U;
 
@@ -75,7 +75,7 @@ float communicationSimulink(FLOATUNION_t val_transmit) {
         //}
         
         sendSimu(val_transmit);
-        digitalWrite(8, LOW);
+
         return val_receive.number[0];
     }
 

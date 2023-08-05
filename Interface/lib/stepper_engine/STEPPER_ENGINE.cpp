@@ -66,12 +66,13 @@ void        STEPPER_ENGINE::setDirection(ENGINE_DIRECTION direction) {
     _direction = direction;
 }
 
-void        STEPPER_ENGINE::setPrescaler(float freq) {
+void        STEPPER_ENGINE::setPrescaler(float rpm) {
+        float               time = 60.0 / (rpm * _steps_per_revolution);
         uint16_t arr_prescaler[] = {1, 8, 64, 256, 1024};
         uint8_t  length = sizeof(arr_prescaler) / sizeof(arr_prescaler[0]);
 
         for (uint8_t i = 0; i < length; i++) {
-            uint32_t ocr_helper = static_cast<uint32_t>(60.0 * F_CPU / freq / _steps_per_revolution / arr_prescaler[i] - 1.0);
+            uint32_t ocr_helper = static_cast<uint32_t>(time * F_CPU / arr_prescaler[i] - 1.0);
             if (ocr_helper < 0xFFFF) {
                 _timer_prescaler = arr_prescaler[i];
                 setOCR(static_cast<uint16_t>(ocr_helper));
@@ -123,19 +124,18 @@ void        STEPPER_ENGINE::move(void) {
 }  
 
 void        STEPPER_ENGINE::startTimerEngine(void) {
+    stopTimerEngine();
     OCR1A = _ocr;
 
     switch (_timer_prescaler)                                       
     {
-        case 1    :  TCCR1B |= _BV(CS10);             TCCR1B &= ~( _BV(CS11) | _BV(CS12) ); break;  // SET CS12 & CS11 & CS10 bit for prescaler 1
-        case 8    :  TCCR1B |= _BV(CS11);             TCCR1B &= ~( _BV(CS10) | _BV(CS12) ); break;  // SET CS12 & CS11 & CS10 bit for prescaler 8  
-        case 64   :  TCCR1B |= _BV(CS11) | _BV(CS10); TCCR1B &= ~( _BV(CS12) );             break;  // SET CS12 & CS11 & CS10 bit for prescaler 64
-        case 256  :  TCCR1B |= _BV(CS12);             TCCR1B &= ~( _BV(CS10) | _BV(CS11) ); break;  // SET CS12 & CS11 & CS10 bit for prescaler 256
-        case 1024 :  TCCR1B |= _BV(CS12) | _BV(CS10); TCCR1B &= ~( _BV(CS11) );             break;  // SET CS12 & CS11 & CS10 bit for prescaler 1024
-        default   :  TCCR1B |= _BV(CS11);             TCCR1B &= ~( _BV(CS10) | _BV(CS12) ); break;  // SET CS12 & CS11 & CS10 bit for prescaler 8 
+        case 1    :  TCCR1B |= _BV(CS10);             break;  // SET CS12 & CS11 & CS10 bit for prescaler 1
+        case 8    :  TCCR1B |= _BV(CS11);             break;  // SET CS12 & CS11 & CS10 bit for prescaler 8  
+        case 64   :  TCCR1B |= _BV(CS11) | _BV(CS10); break;  // SET CS12 & CS11 & CS10 bit for prescaler 64
+        case 256  :  TCCR1B |= _BV(CS12);             break;  // SET CS12 & CS11 & CS10 bit for prescaler 256
+        case 1024 :  TCCR1B |= _BV(CS12) | _BV(CS10); break;  // SET CS12 & CS11 & CS10 bit for prescaler 1024
+        default   :  TCCR1B |= _BV(CS10);             break;  // SET CS12 & CS11 & CS10 bit for prescaler 1 
     }
-
-    TCNT1 = 0;
 }
 
 void        STEPPER_ENGINE::stopTimerEngine(void) {
@@ -147,6 +147,12 @@ void        STEPPER_ENGINE::isrMoveEngine(void) {
     if (STEPPER_ENGINE::_instanceCreated) {
         STEPPER_ENGINE& _instance = STEPPER_ENGINE::getInstance();
         if (_instance._setPosition == false) {
+            /*
+            float freq = _instance.getFreq();
+            freq > 0.24 ? _instance.setDirection(ENGINE_DIRECTION::ccw) 
+                : (freq < -0.24 ? _instance.setDirection(ENGINE_DIRECTION::cw) 
+                    : _instance.setDirection(ENGINE_DIRECTION::undefined));
+            */
             _instance.setDegreeActual();
             _instance.move();
             _instance.startTimerEngine();
@@ -321,7 +327,7 @@ void        STEPPER_ENGINE::begin(void) {
     setDegreeTargetMax(degree_max_local);
     setRpmMax(rpm_max_local);
     setDegreeActual(true);
-    setFreq(0.0);
+    //setAlpha(0.0);
     Serial.println("Finished initialization!");
 }
 
@@ -335,39 +341,44 @@ void        STEPPER_ENGINE::stop(void) {
 
 void STEPPER_ENGINE::setOCR(uint16_t ocr) {    
     _ocr = ocr; 
-    Serial.println(String(_freq, 4) + "\t" + String(_timer_prescaler) + "\t" + String(_ocr) + "\t" + String(_degree_actual/1000.0, 3));
+    //Serial.println(String(_freq, 4) + "\t" + String(_timer_prescaler) + "\t" + String(_ocr) + "\t" + String(_degree_actual/1000.0, 3) + "\t" + String(micros() - time));
 }
 
 void STEPPER_ENGINE::setPosition(bool setPosition) {
     _setPosition = setPosition;
 }
 
-void STEPPER_ENGINE::setFreq(float degree) {
+void STEPPER_ENGINE::setAlpha(float degree, bool print) {
     if (_setPosition) return;
-    //static              float freq_old = 0.0;
-    static  unsigned    long  t_old    = 0;                // old time value in ms
-            unsigned    long  t_now    = micros() / 1000;  // actual timestamp in ms
-                        float t_1      = 100.0;            // T1 in ms
-                        float p_part   = 3.0;
-                        float error    = 0.0;           
-    float dt = t_now - t_old;
+            unsigned    long  t_now      = micros();         // actual timestamp in µs
+    static  unsigned    long  t_old      = t_now;            // old time value in µs
+                        float t_1        = 100.0;            // T1 in ms
+                        float p_part     = 1.0;
+                        float error      = 0.0;           
+
+    static float freq_old = 0.0;
+    
+    float dt = (t_now - t_old) / 1000.0; // cast to ms
     t_old    = t_now;
 
     if (dt == 0.0) return;
 
-    float filter_factor = t_1 / dt; // -> 100ms / 2ms = 50
+    float filter_factor = dt / (t_1 + dt);
 
-    error = (degree - getDegreeActual()) * p_part;
+    /*      P-T1 Member     */
+
+    // hard coded
+    //_freq = degree;
 
     // open loop
-    //_freq = ((_freq * filter_factor) + degree) / (filter_factor + 1.0);
+    _freq = freq_old + (p_part * degree - freq_old) * filter_factor;
 
     // closed loop
-    _freq = ((_freq * filter_factor) + error) / (filter_factor + 1.0);  // compute the angular velocity -> P-T1 element
+    //error = (degree - getDegreeActual());
+    //_freq = _freq + (p_part * error - _freq) * filter_factor;
 
     _freq > 150.0 ? _freq = 150.0 : (_freq < -150.0 ? _freq = -150.0 : _freq = _freq);
-
-    //Serial.print(error, 2); Serial.print('\t'); Serial.println(_freq);
+    freq_old = _freq;
     
     // 0.238Hz max frequency -> PSC:1024 OCR: 0xFFFF | t = 1024 * (0xFFFF + 1) / 16E6
     if (_freq > 0.24) {
@@ -386,7 +397,10 @@ void STEPPER_ENGINE::setFreq(float degree) {
     }
     else {
         _freq = 0.0;
+        setDirection(ENGINE_DIRECTION::undefined);
         STOP_ENGINE();
         stopTimerEngine();
     }
+
+    //if (print) Serial.println(String(filter_factor, 4) + '\t' + String(_freq) + '\t' + String(getDegreeActual()));
 }
