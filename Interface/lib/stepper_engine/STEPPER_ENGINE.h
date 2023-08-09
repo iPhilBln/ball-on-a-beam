@@ -1,7 +1,7 @@
 #ifndef STEPPER_ENGINE_H_INCLUDED
 #define STEPPER_ENGINE_H_INCLUDED
     #include <Arduino.h>
-    #define pi 3.1415926535f
+    #define _PI 3.1415926535f
     /**
     * end position left  = D28 / A6
     * end position right = D29 / A7
@@ -71,12 +71,12 @@
 
                         bool             _setPosition;
                         uint16_t         _ocr;
-                        float            _freq;
 
                         float            _kp;
                         float            _kd;
                         float            _t1;
                         float            _dt;
+                        float            _omega;
                         float            _alpha;
 
                     //void    setDegreeActual(bool reset = false);
@@ -84,10 +84,9 @@
                     void    setDegreePerStep(uint16_t steps_per_revolution);
                     void    setStepMode(ENGINE_STEP_MODE step_mode);
                     void    setDirection(ENGINE_DIRECTION direction);
-                    void    setPrescaler(float freq = 1.0);
+                    void    setPrescaler(float velocity = 0.0);
                     void    setOCR(uint16_t ocr);
                     void    setPosition(bool setPosition);
-                    void    setControllerPosition(void);
                     
                     void    move(void);       
                     void    startTimerEngine(void);
@@ -117,20 +116,19 @@
             void    setKD(float d_part);
             void    setT1(float t1);
             void    setDT(void);
-            void    setAlpha(float degree);
+            void    setAlpha(float angle);
+            void    setOmega(float omega);
             
             // GETTER
             bool                getState(void) const;
             float               getDegreeActual(void) const;
-            float               getDegreeActualSimulink(void) const;
             float               getDegreeTarget(void) const;
             float               getDegreeTargetMax(void) const;
-            float               getFreq(void) const;
-            float               getFreqSimulink(void) const;
             float               getKP(void) const;
             float               getKD(void) const;
             float               getT1(void) const;
             float               getAlpha(void) const;
+            float               getOmega(void) const;
             uint16_t            getRpmActual(void) const;
             uint16_t            getRpmMin(void) const;
             uint16_t            getRpmMax(void) const;

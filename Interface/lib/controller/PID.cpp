@@ -243,8 +243,8 @@ void CONTROLLER::testEngine(void) {
             FLOATUNION_t val_transmit;
             FLOATUNION_t val_receive;
 
-            val_transmit.number[0] = stepper.getFreqSimulink();
-            val_transmit.number[1] = stepper.getDegreeActualSimulink();
+            val_transmit.number[0] = stepper.getOmega();
+            val_transmit.number[1] = stepper.getAlpha();
             val_transmit.number[2] = 0.0;
 
             val_receive = communicationSimulink(val_transmit);

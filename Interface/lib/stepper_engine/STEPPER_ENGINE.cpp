@@ -54,8 +54,9 @@ void        STEPPER_ENGINE::setRpmActual(void) {
     }
     
     _rpm_actual = _rpm_min + 3 * _rpm_counter;
+    float velocity = _rpm_actual * _PI / 30.0f;
 
-    setPrescaler(1.0 * _rpm_actual);
+    setPrescaler(velocity);
 }
 
 void        STEPPER_ENGINE::setDegreePerStep(uint16_t steps_per_revolution) {
@@ -70,10 +71,10 @@ void        STEPPER_ENGINE::setDirection(ENGINE_DIRECTION direction) {
     _direction = direction;
 }
 
-void        STEPPER_ENGINE::setPrescaler(float rpm) {
-        float               time = 60.0 / (rpm * _steps_per_revolution);
+void        STEPPER_ENGINE::setPrescaler(float velocity) {
+        float               time = 2 * _PI / (velocity * _steps_per_revolution);
         uint16_t arr_prescaler[] = {1, 8, 64, 256, 1024};
-        uint8_t  length = sizeof(arr_prescaler) / sizeof(arr_prescaler[0]);
+        uint8_t  length          = sizeof(arr_prescaler) / sizeof(arr_prescaler[0]);
 
         for (uint8_t i = 0; i < length; i++) {
             uint32_t ocr_helper = static_cast<uint32_t>(time * F_CPU / arr_prescaler[i] - 1.0);
@@ -87,71 +88,10 @@ void        STEPPER_ENGINE::setPrescaler(float rpm) {
 
 void STEPPER_ENGINE::setOCR(uint16_t ocr) {    
     _ocr = ocr; 
-    //Serial.println(String(_freq, 4) + "\t" + String(_timer_prescaler) + "\t" + String(_ocr) + "\t" + String(_degree_actual/1000.0, 3) + "\t" + String(micros() - time));
 }
 
 void STEPPER_ENGINE::setPosition(bool setPosition) {
     _setPosition = setPosition;
-}
-
-void STEPPER_ENGINE::setControllerPosition(void) {
-    if (_setPosition) return; 
-            float dt         = 0.002f; // sample time 
-    //static  float error_old  = 0.0f; 
-    static  float freq_old   = 0.0f; 
-
-    float filter_factor = dt / (_t1 + dt);
-
-    /*      P-T1 Member     */
-
-    // hard coded
-    //_freq = _alpha                                                                                                      
-
-    // open loop
-    //_freq = freq_old + (_alpha - freq_old) * filter_factor;
-
-    // closed loop
-    //float step_width = getDegreePerStep();
-    float error = (_alpha - getDegreeActual());
-
-    //((-step_width) <= error && error <= (step_width)) ? error = 0.0 : error = error;
-
-    //Serial.println(String(_t1 ,3) + '\t' + String(_kp, 1));
-    
-    //float p_part = _kp * error;
-    //float d_part = _kd * (error - error_old) / dt;
-    //float sum    = p_part + d_part;
-    
-    //error_old = error;
-    
-    _freq = freq_old + (_kp * error - freq_old) * filter_factor;
-
-    _freq > 150.0 ? _freq = 150.0 : (_freq < -150.0 ? _freq = -150.0 : _freq = _freq);
-    freq_old = _freq;
-
-    //if (_freq > 0.0) Serial.println(String(filter_factor, 3) + '\t' + String(freq_old, 2));
-    
-    // 0.238Hz min frequency -> PSC:1024 OCR: 0xFFFF | t = 1024 * (0xFFFF + 1) / 16E6
-    if (_freq > 0.24) {
-        setDirection(ENGINE_DIRECTION::ccw);
-        setPrescaler(_freq);
-        if (getState() == false) {
-            startTimerEngine();
-        }
-    }
-    else if (_freq < -0.24) {
-        setDirection(ENGINE_DIRECTION::cw);
-        setPrescaler(-1.0 * _freq);
-        if (getState() == false) {
-            startTimerEngine();
-        }
-    }
-    else {
-        _freq = 0.0;
-        setDirection(ENGINE_DIRECTION::undefined);
-        STOP_ENGINE();
-        stopTimerEngine();
-    }
 }
 
 void        STEPPER_ENGINE::move(void) {
@@ -279,7 +219,8 @@ void        STEPPER_ENGINE::setRpmMin(uint16_t rpm_min) {
     stopTimerEngine();
     _rpm_min = rpm_min;
 
-    setPrescaler(1.0 * _rpm_min);
+    float velocity = _rpm_min * _PI / 30.0f;
+    setPrescaler(velocity);
     startTimerEngine();
 }
 
@@ -312,10 +253,49 @@ void        STEPPER_ENGINE::setT1(float t1) {
     _t1 = t1;
 }
 
-void        STEPPER_ENGINE::setAlpha(float alpha) {
-    if (isnan(alpha)) return;
-    _alpha = alpha;
-    setControllerPosition();
+void STEPPER_ENGINE::setAlpha(float angle) {
+    if (_setPosition || isnan (angle)) return;
+    angle > 45.0f ? angle = 45.0f : (angle < -45.0f ? angle = -45.0f : angle = angle);
+    _alpha = getDegreeActual() * _PI / 180.0f;
+
+    float error = angle - _alpha;
+    setOmega(error);
+}
+
+void        STEPPER_ENGINE::setOmega(float omega) {
+    if (_setPosition || isnan (omega)) return; 
+
+    static  float omega_old     = 0.0f;             // old omega value
+            float dt            = 0.002f;           // sample time 
+            float filter_factor = dt / (_t1 + dt);  // filter factor for P-T1 member
+
+    /*      P-T1 Member     */
+    _omega = omega_old + (_kp * omega - omega_old) * filter_factor;
+
+    _omega > 15.7f ? _omega = 15.7f : (_omega < -15.7f ? _omega = -15.7f : _omega = _omega);
+    omega_old = _omega;
+    
+    // 0.039 rad/s min frequency -> PSC:1024 OCR: 0xFFFF | t = 1024 * (0xFFFF + 1) / 16E6
+    if (_omega > 0.0382f) {
+        setDirection(ENGINE_DIRECTION::ccw);
+        setPrescaler(_omega);
+        if (getState() == false) {
+            startTimerEngine();
+        }
+    }
+    else if (_omega < -0.0382f) {
+        setDirection(ENGINE_DIRECTION::cw);
+        setPrescaler(-1.0f * _omega);
+        if (getState() == false) {
+            startTimerEngine();
+        }
+    }
+    else {
+        _omega = 0.0f;
+        setDirection(ENGINE_DIRECTION::undefined);
+        STOP_ENGINE();
+        stopTimerEngine();
+    }
 }
 
 // GETTER
@@ -327,24 +307,12 @@ float      STEPPER_ENGINE::getDegreeActual(void) const {
     return static_cast<float>(_degree_actual / 1000.0);   
 }
 
-float      STEPPER_ENGINE::getDegreeActualSimulink(void) const {
-    return getDegreeActual() * pi / 180.0;
-}
-
 float      STEPPER_ENGINE::getDegreeTarget(void) const {
     return static_cast<float>(_degree_target / 1000.0);
 }
 
 float      STEPPER_ENGINE::getDegreeTargetMax(void) const {
     return static_cast<float>(_degree_target_max / 1000.0);
-}
-
-float      STEPPER_ENGINE::getFreq(void) const {
-    return _freq;
-}
-
-float      STEPPER_ENGINE::getFreqSimulink(void) const {
-    return getFreq() * pi / 30;
 }
 
 float      STEPPER_ENGINE::getKP(void) const {
@@ -361,6 +329,10 @@ float      STEPPER_ENGINE::getT1(void) const {
 
 float      STEPPER_ENGINE::getAlpha(void) const {
     return _alpha;
+}
+
+float      STEPPER_ENGINE::getOmega(void) const {
+    return _omega;
 }
 
 uint16_t    STEPPER_ENGINE::getRpmActual(void) const {
