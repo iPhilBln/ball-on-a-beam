@@ -11,16 +11,10 @@
 
 // Create a union to easily convert float to byte
 typedef union{
-  float number[4];
-  byte  buffer[16];
+  float number[3];
+  byte  buffer[12];
 } FLOATUNION_t;
 
-void    transmitFloatToSimulink(float val);
-float   receiveFloatFromSimulink(void);
-
-void  sendSimu(FLOATUNION_t val);
-float recSimu(void);
-
-float communicationSimulink(FLOATUNION_t val);
+FLOATUNION_t communicationSimulink(FLOATUNION_t val);
 
 #endif

@@ -9,6 +9,10 @@ STEPPER_ENGINE& STEPPER_ENGINE::getInstance(ENGINE_STEP_MODE step_mode, uint16_t
 
     if (_instanceCreated == false) {
         _instance.setPosition(true);
+        _instance.setKP(0.0);
+        _instance.setKD(0.0);
+        _instance.setT1(0.0);
+        _instance.setAlpha(0.0);
         _instance.setDegreeTargetMax(45.0);
         _instance.setDegreeTarget(0.0);
         _instance.setStepMode(step_mode);
@@ -81,6 +85,75 @@ void        STEPPER_ENGINE::setPrescaler(float rpm) {
         }
 }
 
+void STEPPER_ENGINE::setOCR(uint16_t ocr) {    
+    _ocr = ocr; 
+    //Serial.println(String(_freq, 4) + "\t" + String(_timer_prescaler) + "\t" + String(_ocr) + "\t" + String(_degree_actual/1000.0, 3) + "\t" + String(micros() - time));
+}
+
+void STEPPER_ENGINE::setPosition(bool setPosition) {
+    _setPosition = setPosition;
+}
+
+void STEPPER_ENGINE::setControllerPosition(void) {
+    if (_setPosition) return; 
+            float dt         = 0.002f; // sample time 
+    //static  float error_old  = 0.0f; 
+    static  float freq_old   = 0.0f; 
+
+    float filter_factor = dt / (_t1 + dt);
+
+    /*      P-T1 Member     */
+
+    // hard coded
+    //_freq = _alpha                                                                                                      
+
+    // open loop
+    //_freq = freq_old + (_alpha - freq_old) * filter_factor;
+
+    // closed loop
+    //float step_width = getDegreePerStep();
+    float error = (_alpha - getDegreeActual());
+
+    //((-step_width) <= error && error <= (step_width)) ? error = 0.0 : error = error;
+
+    //Serial.println(String(_t1 ,3) + '\t' + String(_kp, 1));
+    
+    //float p_part = _kp * error;
+    //float d_part = _kd * (error - error_old) / dt;
+    //float sum    = p_part + d_part;
+    
+    //error_old = error;
+    
+    _freq = freq_old + (_kp * error - freq_old) * filter_factor;
+
+    _freq > 150.0 ? _freq = 150.0 : (_freq < -150.0 ? _freq = -150.0 : _freq = _freq);
+    freq_old = _freq;
+
+    //if (_freq > 0.0) Serial.println(String(filter_factor, 3) + '\t' + String(freq_old, 2));
+    
+    // 0.238Hz min frequency -> PSC:1024 OCR: 0xFFFF | t = 1024 * (0xFFFF + 1) / 16E6
+    if (_freq > 0.24) {
+        setDirection(ENGINE_DIRECTION::ccw);
+        setPrescaler(_freq);
+        if (getState() == false) {
+            startTimerEngine();
+        }
+    }
+    else if (_freq < -0.24) {
+        setDirection(ENGINE_DIRECTION::cw);
+        setPrescaler(-1.0 * _freq);
+        if (getState() == false) {
+            startTimerEngine();
+        }
+    }
+    else {
+        _freq = 0.0;
+        setDirection(ENGINE_DIRECTION::undefined);
+        STOP_ENGINE();
+        stopTimerEngine();
+    }
+}
+
 void        STEPPER_ENGINE::move(void) {
     switch (_step_mode) {
         case ENGINE_STEP_MODE::halfstep:
@@ -147,12 +220,6 @@ void        STEPPER_ENGINE::isrMoveEngine(void) {
     if (STEPPER_ENGINE::_instanceCreated) {
         STEPPER_ENGINE& _instance = STEPPER_ENGINE::getInstance();
         if (_instance._setPosition == false) {
-            /*
-            float freq = _instance.getFreq();
-            freq > 0.24 ? _instance.setDirection(ENGINE_DIRECTION::ccw) 
-                : (freq < -0.24 ? _instance.setDirection(ENGINE_DIRECTION::cw) 
-                    : _instance.setDirection(ENGINE_DIRECTION::undefined));
-            */
             _instance.setDegreeActual();
             _instance.move();
             _instance.startTimerEngine();
@@ -230,6 +297,27 @@ void        STEPPER_ENGINE::setStepsPerRevolution(uint16_t steps_per_revolution)
     setDegreePerStep(_steps_per_revolution);
 }
 
+void        STEPPER_ENGINE::setKP(float kp) {
+    if (isnan(kp)) return;
+    _kp = kp;
+}
+
+void        STEPPER_ENGINE::setKD(float kd) {
+    if (isnan(kd)) return;
+    _kd = kd;
+}
+
+void        STEPPER_ENGINE::setT1(float t1) {
+    if (isnan(t1)) return;
+    _t1 = t1;
+}
+
+void        STEPPER_ENGINE::setAlpha(float alpha) {
+    if (isnan(alpha)) return;
+    _alpha = alpha;
+    setControllerPosition();
+}
+
 // GETTER
 bool        STEPPER_ENGINE::getState(void) const {
     return TCCR1B & (_BV(CS12) | _BV(CS11) | _BV(CS10));
@@ -237,6 +325,10 @@ bool        STEPPER_ENGINE::getState(void) const {
 
 float      STEPPER_ENGINE::getDegreeActual(void) const {
     return static_cast<float>(_degree_actual / 1000.0);   
+}
+
+float      STEPPER_ENGINE::getDegreeActualSimulink(void) const {
+    return getDegreeActual() * pi / 180.0;
 }
 
 float      STEPPER_ENGINE::getDegreeTarget(void) const {
@@ -249,6 +341,26 @@ float      STEPPER_ENGINE::getDegreeTargetMax(void) const {
 
 float      STEPPER_ENGINE::getFreq(void) const {
     return _freq;
+}
+
+float      STEPPER_ENGINE::getFreqSimulink(void) const {
+    return getFreq() * pi / 30;
+}
+
+float      STEPPER_ENGINE::getKP(void) const {
+    return _kp;
+}
+
+float      STEPPER_ENGINE::getKD(void) const {
+    return _kd;
+}
+
+float      STEPPER_ENGINE::getT1(void) const {
+    return _t1;
+}
+
+float      STEPPER_ENGINE::getAlpha(void) const {
+    return _alpha;
 }
 
 uint16_t    STEPPER_ENGINE::getRpmActual(void) const {
@@ -327,7 +439,7 @@ void        STEPPER_ENGINE::begin(void) {
     setDegreeTargetMax(degree_max_local);
     setRpmMax(rpm_max_local);
     setDegreeActual(true);
-    //setAlpha(0.0);
+    setAlpha(0.0);
     Serial.println("Finished initialization!");
 }
 
@@ -339,68 +451,5 @@ void        STEPPER_ENGINE::stop(void) {
     Serial.println("Finish");
 }
 
-void STEPPER_ENGINE::setOCR(uint16_t ocr) {    
-    _ocr = ocr; 
-    //Serial.println(String(_freq, 4) + "\t" + String(_timer_prescaler) + "\t" + String(_ocr) + "\t" + String(_degree_actual/1000.0, 3) + "\t" + String(micros() - time));
-}
 
-void STEPPER_ENGINE::setPosition(bool setPosition) {
-    _setPosition = setPosition;
-}
 
-void STEPPER_ENGINE::setAlpha(float degree, bool print) {
-    if (_setPosition) return;
-            unsigned    long  t_now      = micros();         // actual timestamp in µs
-    static  unsigned    long  t_old      = t_now;            // old time value in µs
-                        float t_1        = 100.0;            // T1 in ms
-                        float p_part     = 1.0;
-                        float error      = 0.0;           
-
-    static float freq_old = 0.0;
-    
-    float dt = (t_now - t_old) / 1000.0; // cast to ms
-    t_old    = t_now;
-
-    if (dt == 0.0) return;
-
-    float filter_factor = dt / (t_1 + dt);
-
-    /*      P-T1 Member     */
-
-    // hard coded
-    //_freq = degree;
-
-    // open loop
-    _freq = freq_old + (p_part * degree - freq_old) * filter_factor;
-
-    // closed loop
-    //error = (degree - getDegreeActual());
-    //_freq = _freq + (p_part * error - _freq) * filter_factor;
-
-    _freq > 150.0 ? _freq = 150.0 : (_freq < -150.0 ? _freq = -150.0 : _freq = _freq);
-    freq_old = _freq;
-    
-    // 0.238Hz max frequency -> PSC:1024 OCR: 0xFFFF | t = 1024 * (0xFFFF + 1) / 16E6
-    if (_freq > 0.24) {
-        setDirection(ENGINE_DIRECTION::ccw);
-        setPrescaler(_freq);
-        if (getState() == false) {
-            startTimerEngine();
-        }
-    }
-    else if (_freq < -0.24) {
-        setDirection(ENGINE_DIRECTION::cw);
-        setPrescaler(-1.0 * _freq);
-        if (getState() == false) {
-            startTimerEngine();
-        }
-    }
-    else {
-        _freq = 0.0;
-        setDirection(ENGINE_DIRECTION::undefined);
-        STOP_ENGINE();
-        stopTimerEngine();
-    }
-
-    //if (print) Serial.println(String(filter_factor, 4) + '\t' + String(_freq) + '\t' + String(getDegreeActual()));
-}

@@ -227,48 +227,37 @@ void CONTROLLER::runStepresponseOpenLoop(float step) {
 
 void CONTROLLER::testEngine(void) {
     Serial.println("Start Test...");    
-    static float alpha = 0.0;
+    pinMode(10, INPUT_PULLUP);
 
-    while (Serial1.available()) Serial1.read(); // clear Inputbuffer
-    digitalWrite(8, HIGH);
-    pinMode(9, OUTPUT);
-    uint16_t counter = 0;
-    bool display = true;
-    
     while (true) {
-        _running = true;
-        digitalWrite(9, HIGH);
-
-        FLOATUNION_t val_transmit;
-        val_transmit.number[0] = stepper.getFreq();
-        val_transmit.number[1] = stepper.getDegreeActual();
-        val_transmit.number[2] = 0.0;
-        val_transmit.number[3] = 0.0;
+        while (Serial1.available()) Serial1.read(); // clear Inputbuffer
+        static float alpha = 0.0;
+        stepper.setDegreeActual(true);
+        digitalWrite(8, HIGH);
+        pinMode(9, OUTPUT);
         
-        float alpha_receive = communicationSimulink(val_transmit);
-        isnan(alpha_receive) ? alpha = alpha : alpha = alpha_receive;
+        while (digitalRead(10) == HIGH) {
+            _running = true;
+            digitalWrite(9, HIGH);
 
-        if (alpha_receive > 0.0) {
-            if (counter < 1000) {
-                display = true;
-                //alpha = 60.0;
-                counter++;
-            }
-            else {
-                display = false;
-                alpha = 0.0;
-            }
+            FLOATUNION_t val_transmit;
+            FLOATUNION_t val_receive;
+
+            val_transmit.number[0] = stepper.getFreqSimulink();
+            val_transmit.number[1] = stepper.getDegreeActualSimulink();
+            val_transmit.number[2] = 0.0;
+
+            val_receive = communicationSimulink(val_transmit);
+
+            stepper.setKP(val_receive.number[0]);
+            stepper.setT1(val_receive.number[1]);
+            stepper.setAlpha(val_receive.number[2]);
+
+            digitalWrite(9, LOW);
+            
+            while(_running) {}
         }
-        else {
-            alpha = 0.0;
-            display = false;
-        }
-
-        stepper.setAlpha(alpha, display);
-
-        digitalWrite(9, LOW);
-        
-        while(_running) {}
+        Serial.println("Reset");
     }
     Serial.println("Ende");
 }

@@ -1,7 +1,7 @@
 #ifndef STEPPER_ENGINE_H_INCLUDED
 #define STEPPER_ENGINE_H_INCLUDED
     #include <Arduino.h>
-    
+    #define pi 3.1415926535f
     /**
     * end position left  = D28 / A6
     * end position right = D29 / A7
@@ -73,7 +73,13 @@
                         uint16_t         _ocr;
                         float            _freq;
 
-                    void    setDegreeActual(bool reset = false);
+                        float            _kp;
+                        float            _kd;
+                        float            _t1;
+                        float            _dt;
+                        float            _alpha;
+
+                    //void    setDegreeActual(bool reset = false);
                     void    setRpmActual(void);
                     void    setDegreePerStep(uint16_t steps_per_revolution);
                     void    setStepMode(ENGINE_STEP_MODE step_mode);
@@ -81,6 +87,7 @@
                     void    setPrescaler(float freq = 1.0);
                     void    setOCR(uint16_t ocr);
                     void    setPosition(bool setPosition);
+                    void    setControllerPosition(void);
                     
                     void    move(void);       
                     void    startTimerEngine(void);
@@ -99,19 +106,31 @@
             static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 3, uint16_t rpm_max = 120, uint16_t steps_per_revolution = 200);
 
             // SETTER
+            void    setDegreeActual(bool reset = false); //testen
+
             void    setDegreeTargetMax(float degree_target_max);
             void    setDegreeTarget(float degree_target);
             void    setRpmMin(uint16_t rpm_min);
             void    setRpmMax(uint16_t rpm_max);
             void    setStepsPerRevolution(uint16_t steps_per_revolution);
-            void    setAlpha(float degree , bool print);
+            void    setKP(float p_part);
+            void    setKD(float d_part);
+            void    setT1(float t1);
+            void    setDT(void);
+            void    setAlpha(float degree);
             
             // GETTER
             bool                getState(void) const;
             float               getDegreeActual(void) const;
+            float               getDegreeActualSimulink(void) const;
             float               getDegreeTarget(void) const;
             float               getDegreeTargetMax(void) const;
             float               getFreq(void) const;
+            float               getFreqSimulink(void) const;
+            float               getKP(void) const;
+            float               getKD(void) const;
+            float               getT1(void) const;
+            float               getAlpha(void) const;
             uint16_t            getRpmActual(void) const;
             uint16_t            getRpmMin(void) const;
             uint16_t            getRpmMax(void) const;
