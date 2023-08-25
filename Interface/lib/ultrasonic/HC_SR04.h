@@ -27,16 +27,16 @@
 
     class HC_SR04 {
         private:
-            inline  static  bool    _instanceCreated = false;
+            inline  static  bool     _instanceCreated = false;
 
-                        double      _temperature;
-                        double      _ultrasonic_speed;
+                        float       _temperature;
+                        float       _ultrasonic_speed;
                         uint8_t     _ball_radius;
                         uint8_t     _timer_prescaler;
 
-            inline  static  volatile    uint16_t    _echo_counter_left  = 0;
-            inline  static  volatile    uint16_t    _echo_counter_right = 0;
-            inline  static  volatile    bool        _echo_timeout       = false;
+            volatile    uint16_t    _echo_counter_left;
+            volatile    uint16_t    _echo_counter_right;
+            volatile    bool        _echo_timeout;
 
                         uint8_t     _offset_left;
                         uint16_t    _distance_left;
@@ -50,9 +50,12 @@
 
                     void    setOffsetLeft(void);
                     void    setOffsetRight(void);
-            
+                    void    setDistance(void);
+
                     void    setUltrasonicSpeed(double temperature);
 
+                    void    beginSensorLeft(void);
+                    void    beginSensorRight(void);
                     void    startTimerEchoLeft(void);
                     void    stopTimerEchoLeft(void);
                     void    startTimerEchoRight(void);
@@ -72,33 +75,27 @@
             HC_SR04& operator = (const HC_SR04&) = delete;            
         
         public:
-            static HC_SR04& getInstance(uint8_t ball_radius = 20, double  temperature = 20.0, uint8_t timer_prescaler = 1);
-            //HC_SR04();
-            //HC_SR04(uint8_t ball_radius, uint8_t timer_prescaler = 1);
-            //HC_SR04(double  temperature, uint8_t timer_prescaler = 1);
-            //HC_SR04(uint8_t ball_radius, double  temperature, uint8_t timer_prescaler = 1);
-
-            double  getUltrasonicSpeed(void);
-
+            static HC_SR04& getInstance(uint8_t ball_radius = 20, double  temperature = 20.0f, uint8_t timer_prescaler = 1);
+            
+            /*      SETTER      */
             void    setTimerPrescaler(uint8_t timer_prescaler);
-            uint8_t getTimerPrescaler(void);
-
             void    setBallRadius(uint8_t ball_radius);
-            uint8_t getBallRadius(void);
-
             void    setTemperature(double temperature);
-            double  getTemperature(void);
+            
+            /*      GETTER      */
+            uint8_t getBallRadius(void) const;
+            float   getTemperature(void) const;
+            float   getUltrasonicSpeed(void) const;
+            uint8_t getTimerPrescaler(void) const;
+            uint8_t getOffsetLeft(void) const;
+            uint8_t getOffsetRight(void) const;
 
-            uint8_t getOffsetLeft(void);
-            uint8_t getOffsetRight(void);
-
+            /*      FUNCTIONALITY       */
             uint16_t getDistanceSensorLeft(void);
             uint16_t getDistanceSensorRight(void);
-
             uint16_t getDistance(void);
+            float    getDistanceSimulink(void);
 
             void beginUltrasonic(void);
-            void beginSensorLeft(void);
-            void beginSensorRight(void);
     };
 #endif
