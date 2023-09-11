@@ -27,14 +27,13 @@ void    HC_SR04::setOffset(void) {
         distance_old = distance;
         while (millis() < cycle_time) {}
     }
+
     _offset = static_cast<uint8_t>(distance);
+    _distance = 0U;
 
     Serial.println("Offset ultrasonic sensor: " + String(_offset));
 
-    stepper.setDegreeTarget(0.0F);
-    
-    _distance = 0U;
-    
+    stepper.setDegreeTarget(0.0F);   
     while(stepper.getState()) {} // wait until engine is running
 }
 
@@ -154,14 +153,10 @@ uint16_t HC_SR04::getDistance(void) {
     unsigned long delaySensor = millis() + 10U; 
     uint16_t distance_local   = getDistancePure();
 
-    Serial.print(String(_offset) + '\t' + String(distance_local) + '\t');
-
     if (distance_local >= _offset) {
         distance_local   = 450U - _ball_radius - (distance_local - _offset);
         (_ball_radius <= distance_local && distance_local <= 450U - _ball_radius) ? _distance = distance_local : _distance;
     }
-
-    Serial.println(_distance);
 
     while (millis() < delaySensor) {};
 
@@ -184,14 +179,11 @@ float HC_SR04::getDistanceSimulink(void) {
             distance_local  = _echo_counter;
             distance_local *= _ultrasonic_speed; 
             distance_local /= 32000U;
-            
-            Serial.print(String(_offset) + '\t' + String(distance_local) + '\t');
 
             if (distance_local >= _offset) {
                 distance_local  = 450U - _ball_radius - (distance_local - _offset);
                 (_ball_radius <= distance_local && distance_local <= 450U - _ball_radius) ? _distance = static_cast<uint16_t>(distance_local) : _distance; 
             }
-            Serial.println(_distance);
         }
 
         startTimerEcho();

@@ -27,11 +27,11 @@ void TOF::setOffset(void) {
         }
         while (millis() < cycle_time) {}
     }
+
     _offset = static_cast<uint8_t>(distance);
+    _distance = 0U;
 
     Serial.println("Offset ToF sensor: " + String(_offset));
-
-    _distance = 0U;
 
     stepper.setDegreeTarget(0.0F);
     while(stepper.getState()) {}    // wait until engine is running
@@ -74,6 +74,7 @@ uint16_t TOF::getDistancePure() {
         startMeasurement();
         return distance_local;
     }
+
     return 0xFFFF;
 }
 
