@@ -1,11 +1,14 @@
 #ifndef STEPPER_ENGINE_H_INCLUDED
 #define STEPPER_ENGINE_H_INCLUDED
     #include <Arduino.h>
+
     #define _PI 3.1415926535f
+
     /**
     * end position left  = D28 / A6
     * end position right = D29 / A7
     */
+   
     #define SET_GPIO_DIRECTION_END_POSITON_PUSHBUTTON() DDRA &= ~( _BV(PA6) | _BV(PA7) ); PORTA |= _BV(PA6) | _BV(PA7)  // set D06 and D07 as INPUT and activate internal Pull-Up resistor
     #define CHECK_END_POSITION_LEFT()   (PINA & _BV(PA6))  // check if D06 is HIGH == TRUE -> no end position detected | LOW == FALSE -> end position is detected
     #define CHECK_END_POSITION_RIGHT()  (PINA & _BV(PA7))  // check if D07 is HIGH == TRUE -> no end position detected | LOW == FALSE -> end position is detected
@@ -102,7 +105,7 @@
             STEPPER_ENGINE(const STEPPER_ENGINE&) = delete;
             STEPPER_ENGINE& operator = (const STEPPER_ENGINE&) = delete;
         public:
-            static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 3, uint16_t rpm_max = 120, uint16_t steps_per_revolution = 200);
+            static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 3, uint16_t rpm_max = 50, uint16_t steps_per_revolution = 200);
 
             // SETTER
             void    setDegreeActual(bool reset = false); //testen

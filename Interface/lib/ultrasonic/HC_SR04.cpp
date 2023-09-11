@@ -3,58 +3,40 @@
 HC_SR04& HC_SR04::getInstance(uint8_t ball_radius, double  temperature, uint8_t timer_prescaler) {
     static HC_SR04 _instance;
 
-    if (_instanceCreated == false) {
+    if (_instanceUltrasonicCreated == false) {
         _instance.setBallRadius(ball_radius);
         _instance.setTemperature(temperature);
         _instance.setTimerPrescaler(timer_prescaler);
 
-        _instanceCreated = true;
+        _instanceUltrasonicCreated = true;
     }
     return _instance;
 }
 
-void    HC_SR04::setOffsetLeft(void) {
-    uint8_t   counter      = 0;
+void    HC_SR04::setOffset(void) {
+    uint16_t  counter      = 0;
     uint16_t  distance     = 0;
     uint16_t  distance_old = 0;
 
-    while (counter < 250U) {
-        unsigned long cycle_time = micros() + 5500U; // 5,5ms per measurement cycle
+    while (counter < 500U) {
+        unsigned long cycle_time = millis() + 10U; // 10ms per measurement cycle
 
-        distance = (getDistanceSensorLeft() - 0U - _ball_radius);
+        distance = getDistancePure() - _ball_radius;
         (0U < distance && distance < 150U) && (distance_old - 1 <= distance || distance <= distance_old + 1) ? counter++ : counter = 0;
         distance_old = distance;
-        while (micros() < cycle_time) {}
+        while (millis() < cycle_time) {}
     }
-    _offset_left = static_cast<uint8_t>(distance);
+    _offset = static_cast<uint8_t>(distance);
 
-    Serial.println("Offset left: " + String(_offset_left));
-}
-
-void    HC_SR04::setOffsetRight(void) {
-    uint8_t   counter      = 0;
-    uint16_t  distance     = 0;
-    uint16_t  distance_old = 0;
-
-    while (counter < 250U) {
-        unsigned long cycle_time = micros() + 5500U; // 5,5ms per measurement cycle
-
-        distance = 450U - _ball_radius - getDistanceSensorRight();
-        (0U < distance && distance < 150U) && (distance_old - 1 <= distance || distance <= distance_old + 1) ? counter++ : counter = 0;
-        distance_old = distance;
-        while (micros() < cycle_time) {}
-    }
-    _offset_right = static_cast<uint8_t>(distance);
-
-    Serial.println("Offset right: " + String(_offset_right));
+    Serial.println("Offset: " + String(_offset));
 }
 
 void    HC_SR04::setUltrasonicSpeed(double temperature) {
     _ultrasonic_speed = sqrt(1.402F * 8.3145F * (273.15F + temperature) / 0.02896F);
 }
 
-void HC_SR04::beginSensorLeft(void) {
-    stopTimerEchoLeft();
+void HC_SR04::beginSensor(void) {
+    stopTimerEcho();
 
     TCCR4A = 0;
     TCCR4B = _BV(ICNC4) | _BV(ICES4) | _BV(WGM42);
@@ -62,36 +44,17 @@ void HC_SR04::beginSensorLeft(void) {
     TIMSK4 = _BV(ICIE4) | _BV(OCIE4A);
 
     switch (_timer_prescaler) {
-        case 1 : OCR4A = static_cast<uint16_t>(3.5F * 16000 - 1);   break;
-        case 8 : OCR4A = static_cast<uint16_t>(3.5F * 8000 - 1);    break;
+        case 1 : OCR4A = static_cast<uint16_t>(3.5F * 16000 - 1);   break;  // echo time out after 3.5ms
+        case 8 : OCR4A = static_cast<uint16_t>(3.5F * 8000 - 1);    break;  // echo time out after 3.5ms
     }
 
-    _SET_GPIO_DIRECTION_ULTRASONIC_ECHO_LEFT();
-    _SET_GPIO_DIRECTION_ULTRASONIC_TRIGGER_LEFT();
+    _SET_GPIO_DIRECTION_ULTRASONIC_ECHO();
+    _SET_GPIO_DIRECTION_ULTRASONIC_TRIGGER();
 
-    setOffsetLeft();
+    setOffset();
 }
 
-void HC_SR04::beginSensorRight(void) {
-    stopTimerEchoRight();
-
-    TCCR5A = 0;
-    TCCR5B = _BV(ICNC5) | _BV(ICES5) | _BV(WGM52);
-    TCCR5C = 0;
-    TIMSK5 = _BV(ICIE5) | _BV(OCIE5A);
-
-    switch (_timer_prescaler) {
-        case 1 : OCR5A = static_cast<uint16_t>(3.5F * 16000 - 1);   break;
-        case 8 : OCR5A = static_cast<uint16_t>(3.5F * 8000 - 1);    break;
-    }
-
-    _SET_GPIO_DIRECTION_ULTRASONIC_ECHO_RIGHT();
-    _SET_GPIO_DIRECTION_ULTRASONIC_TRIGGER_RIGHT();
-
-    setOffsetRight();
-}
-
-void   HC_SR04::startTimerEchoLeft(void){
+void   HC_SR04::startTimerEcho(void){
     TCNT4   = 0;            // reset counter value timer 4
     TCCR4B |= _BV(ICES4);   // capture TCNT4 on rising edge at first
     
@@ -100,98 +63,39 @@ void   HC_SR04::startTimerEchoLeft(void){
         case 8 : TCCR4B |= _BV(CS41) | _BV(CS40);  break;
     }
 
+    _echo_counter = 0;
     _echo_timeout = false;
-    _ULTRASONIC_TRIGGER_LEFT_START();
+    _measurement_completed = false;
+
+    _ULTRASONIC_TRIGGER_START();
 }
 
-void   HC_SR04::stopTimerEchoLeft(void){
+void   HC_SR04::stopTimerEcho(void){
     TCCR4B &= ~( _BV(CS42) | _BV(CS41) | _BV(CS40) );
-    _ULTRASONIC_TRIGGER_LEFT_STOP();
+    _ULTRASONIC_TRIGGER_STOP();
 }
 
-void   HC_SR04::startTimerEchoRight(void){
-    TCNT5   = 0;            // reset counter value timer 5
-    TCCR5B |= _BV(ICES5);   // capture TCNT5 on rising edge at first
-
-    switch (_timer_prescaler) {
-        case 1 : TCCR5B |= _BV(CS50);              break;
-        case 8 : TCCR5B |= _BV(CS51) | _BV(CS50);  break;
-    }
-
-    _echo_timeout = false;
-    _ULTRASONIC_TRIGGER_RIGHT_START();
-}
-
-void   HC_SR04::stopTimerEchoRight(void){
-    TCCR5B &= ~( _BV(CS52) | _BV(CS51) | _BV(CS50) );
-    _ULTRASONIC_TRIGGER_RIGHT_STOP();
-}
-
-void HC_SR04::setDistance(void) {
-    uint16_t      distance_local = 0;
-
-    if (_distance_left < 71U) {
-        distance_local = _distance_left;
-    }
-    else if (_distance_right > 371U) {
-        distance_local = _distance_right;
-    }
-    else if (270U < _distance_left && _distance_left < 371U) {
-        distance_local = _distance_left;
-    }
-    else if (70U < _distance_right && _distance_right < 171U) {
-        distance_local = _distance_right;
-    }
-    else if (170U < _distance_left && _distance_left < 226U) {
-        distance_local = _distance_left;
-    }
-    else if (225U < _distance_right && _distance_right < 271U) {
-        distance_local = _distance_right;
-    }
-    else {
-        distance_local = (_distance_left + _distance_right) >> 1;
-    }
-
-    distance_local < 450U - _ball_radius ? _distance = 450 - distance_local : _distance;
-    Serial.println(String(distance_local) + '\t' + String(_distance));
-}
-
-
-void HC_SR04::isrEchoLeftCapture(void) {
-    if (_instanceCreated) {
+void HC_SR04::isrEchoCapture(void) {
+    if (_instanceUltrasonicCreated) {
         HC_SR04& _instance = HC_SR04::getInstance();
 
-        if (TCCR4B & _BV(ICES4)) _instance._echo_counter_left = TCNT4;                                      // capture rising edge
-        else                     _instance._echo_counter_left = TCNT4 - _instance._echo_counter_left;       // capture falling edge
+        if (TCCR4B & _BV(ICES4)) {
+            _instance._echo_counter = TCNT4;                                 // capture rising edge
+        }
+        else {
+            _instance._echo_counter = TCNT4 - _instance._echo_counter;       // capture falling edge
+            _instance._measurement_completed = true;
+        }
 
         TCCR4B &= ~( _BV(ICES4) );
     }
 }
 
-void HC_SR04::isrEchoLeftTimeout(void) {
-    if (_instanceCreated) {
+void HC_SR04::isrEchoTimeout(void) {
+    if (_instanceUltrasonicCreated) {
         HC_SR04& _instance = HC_SR04::getInstance();
 
-        _instance._echo_timeout = true;
-    }
-}
-
-void HC_SR04::isrEchoRightCapture(void) {
-    if (_instanceCreated) {
-        HC_SR04& _instance = HC_SR04::getInstance();
-
-        if (TCCR5B & _BV(ICES5)) _instance._echo_counter_right = TCNT5;                                     // capture rising edge
-        else                     _instance._echo_counter_right = TCNT5 - _instance._echo_counter_right;     // capture falling edge
-
-        TCCR5B &= ~( _BV(ICES5) );
-    }
-}
-
-void HC_SR04::isrEchoRightTimeout(void) {
-    if (_instanceCreated) {
-        HC_SR04& _instance = HC_SR04::getInstance();
-
-        _instance._echo_timeout = true;
+        if (_instance._measurement_completed == false) _instance._echo_timeout = true;
     }
 }
 
@@ -229,97 +133,38 @@ uint8_t HC_SR04::getTimerPrescaler(void) const {
     return _timer_prescaler;
 }
 
-uint8_t HC_SR04::getOffsetLeft(void) const {
-    return _offset_left;
+uint8_t HC_SR04::getOffset(void) const {
+    return _offset;
 }
 
-uint8_t HC_SR04::getOffsetRight(void) const {
-    return _offset_right;
-}
+uint16_t HC_SR04::getDistancePure(void) {
+    if (_ULTRASONIC_CHECK_LEVEL_ECHO()) return 0;
 
-uint16_t HC_SR04::getDistanceSensorLeft(void) {
-    if (_ULTRASONIC_CHECK_LEVEL_ECHO_LEFT()) return _distance_left;
+    startTimerEcho();
 
-             _echo_counter_left  = 0;
-    uint16_t echo_counter_local  = 0;
-    uint32_t distance_local      = 0;
+    while (_echo_timeout == false && _measurement_completed == false) {}
 
-    startTimerEchoLeft();
+    stopTimerEcho();
 
-    while (_echo_counter_left == 0) {
-        if (_echo_timeout) {
-            stopTimerEchoLeft();
-            //Serial.println("Timeout left rising edge!");
-            return _distance_left;
-        }
-    }
-
-    echo_counter_local = _echo_counter_left;
-    _echo_counter_left = 0;
-
-    while (_echo_counter_left == 0) {
-        if (_echo_timeout) {
-            stopTimerEchoLeft();
-            //Serial.println("Timeout left falling edge!");
-            return _distance_left;
-        }
-    }
-    stopTimerEchoLeft();
+    if (_measurement_completed == false) return 0;
     
-    distance_local  = _echo_counter_left - echo_counter_local;
+    uint32_t distance_local;
+    distance_local  = _echo_counter;
+    //Serial.println(_echo_counter);
     distance_local *= _ultrasonic_speed; 
     distance_local /= (32000U / _timer_prescaler);
-    distance_local  = 0U + _ball_radius + (distance_local - _offset_left);
+    distance_local  = _ball_radius + (distance_local - _offset);
 
-    return (distance_local <= 450U) ? _distance_left = static_cast<uint16_t>(distance_local) : _distance_left; 
-}
-
-uint16_t HC_SR04::getDistanceSensorRight(void) {
-    if (_ULTRASONIC_CHECK_LEVEL_ECHO_RIGHT()) return _distance_right;
-
-             _echo_counter_right = 0;
-    uint16_t echo_counter_local  = 0;
-    uint32_t distance_local      = 0;
-
-    startTimerEchoRight();
-
-    while (_echo_counter_right == 0U) {
-        if (_echo_timeout) {
-            stopTimerEchoLeft();
-            //Serial.println("Timeout right rising edge!");
-            return _distance_right;
-        }
-    }
-
-    echo_counter_local = _echo_counter_right;
-    _echo_counter_right      = 0;
-
-    while (_echo_counter_right == 0U) {
-        if (_echo_timeout) {
-            stopTimerEchoRight();
-            //Serial.println("Timeout right falling edge!");
-            return _distance_right;
-        }
-    }
-
-    stopTimerEchoRight();
-
-    distance_local  = _echo_counter_right - echo_counter_local;
-    distance_local *= _ultrasonic_speed; 
-    distance_local /= (32000U / _timer_prescaler);
-    distance_local  = 450U - _ball_radius - (distance_local - _offset_right);
-
-    return (distance_local <= 450U) ? _distance_right = static_cast<uint16_t>(distance_local) : _distance_right; 
+    return static_cast<uint16_t>(distance_local);
 }
 
 uint16_t HC_SR04::getDistance(void) {
-    unsigned long delaySensor    = micros() + 5500U; 
-    
-    getDistanceSensorLeft();
-    while (micros() < delaySensor) {};
-    getDistanceSensorRight();
+    unsigned long delaySensor = millis() + 10U; 
+    uint16_t distance_local   = getDistancePure();
 
-    setDistance();
+    while (millis() < delaySensor) {};
+
+    (distance_local <= 450U - _ball_radius) ? _distance = 450U - distance_local : _distance;
     return _distance;
 }
 
@@ -327,76 +172,43 @@ float HC_SR04::getDistanceSimulink(void) {
     static uint8_t counter = 0;
 
     if (counter == 0U) {         // 0ms
-        if (_ULTRASONIC_CHECK_LEVEL_ECHO_LEFT() || _ULTRASONIC_CHECK_LEVEL_ECHO_RIGHT()) {
+        if (_ULTRASONIC_CHECK_LEVEL_ECHO()) {
             counter = 0; 
-
-            stopTimerEchoLeft();
-            stopTimerEchoRight();
-
+            stopTimerEcho();
             return _distance / 1000.0F;
         }
 
-        startTimerEchoLeft();
-    }
-    else if (counter == 3U) {    // 6ms 
-        if (_ULTRASONIC_CHECK_LEVEL_ECHO_LEFT() || _ULTRASONIC_CHECK_LEVEL_ECHO_RIGHT()) {
-            counter = 0;
+        stopTimerEcho();
 
-            stopTimerEchoLeft();
-            stopTimerEchoRight();
+        if (_echo_counter > 0 && _echo_timeout == false) {
+            uint32_t distance_local;
+            distance_local  = _echo_counter;
+            Serial.println(_echo_counter);
+            distance_local *= _ultrasonic_speed; 
+            distance_local /= (32000U / _timer_prescaler);
+            //Serial.print(distance_local);
+            distance_local  = 450U - _ball_radius - (distance_local - _offset);
 
-            return _distance / 1000.0F;
+            (distance_local <= 450U - _ball_radius) ? _distance = static_cast<uint16_t>(distance_local) : _distance; 
+            //Serial.println('\t' + String(_distance) + '\t' + String(_offset));
         }
 
-        stopTimerEchoLeft();
-
-        uint32_t distance_local;
-        distance_local  = _echo_counter_left;
-        distance_local *= _ultrasonic_speed; 
-        distance_local /= (32000U / _timer_prescaler);
-        distance_local  = 0U + _ball_radius + (distance_local - _offset_left);
-
-        (distance_local <= 450U) ? _distance_left = static_cast<uint16_t>(distance_local) : _distance_left = _distance_left; 
-
-        startTimerEchoRight();
-    }
-    else if (counter == 6U) {    // 12 ms
-        if (_ULTRASONIC_CHECK_LEVEL_ECHO_LEFT() || _ULTRASONIC_CHECK_LEVEL_ECHO_RIGHT()) {
-            counter = 0;
-
-            stopTimerEchoLeft();
-            stopTimerEchoRight();
-
-            return _distance / 1000.0F;
-        }
-
-        stopTimerEchoRight();
-
-        uint32_t distance_local;
-        distance_local  = _echo_counter_right;
-        distance_local *= _ultrasonic_speed; 
-        distance_local /= (32000U / _timer_prescaler);
-        distance_local  = 450U - _ball_radius - (distance_local - _offset_right);
-
-        (distance_local <= 450U) ? _distance_right = static_cast<uint16_t>(distance_local) : _distance_right; 
-
-        setDistance();
+        startTimerEcho();
     }
 
-    counter < 6 ? counter++ : counter = 0;
+    counter < 4U ? counter++ : counter = 0U;  // count 4 times -> 10ms measurement cycle
     return _distance / 1000.0F;
 }
 
-void HC_SR04::beginUltrasonic(void) {
-    stepper.setDegreeTarget(20.0F);
-    Serial.println("Begin left.");
-    beginSensorLeft();
+bool HC_SR04::beginUltrasonic(void) {
     stepper.setDegreeTarget(-20.0F);
-    Serial.println("Begin right.");
-    beginSensorRight();
+    Serial.println("Begin sensor calibration.");
+    beginSensor();
     stepper.setDegreeTarget(0.0F);
     
-    _distance = 0;
+    _distance = 0U;
+    _echo_counter = 0U;
     
     while(stepper.getState()) {} // wait until engine is running
+    return true;
 }

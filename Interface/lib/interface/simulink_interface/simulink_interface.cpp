@@ -3,9 +3,6 @@
 
 FLOATUNION_t communicationSimulink(FLOATUNION_t val_transmit) {
     static FLOATUNION_t val_receive;
-    //val_receive.number[0] = NAN;
-    //val_receive.number[1] = NAN;
-    //val_receive.number[2] = NAN;
 
     size_t input_buffer1_length = Serial1.available();
 

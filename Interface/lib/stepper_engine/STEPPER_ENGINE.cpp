@@ -9,12 +9,12 @@ STEPPER_ENGINE& STEPPER_ENGINE::getInstance(ENGINE_STEP_MODE step_mode, uint16_t
 
     if (_instanceCreated == false) {
         _instance.setPosition(true);
-        _instance.setKP(0.0);
-        _instance.setKD(0.0);
-        _instance.setT1(0.0);
-        _instance.setAlpha(0.0);
-        _instance.setDegreeTargetMax(45.0);
-        _instance.setDegreeTarget(0.0);
+        _instance.setKP(0.0F);
+        _instance.setKD(0.0F);
+        _instance.setT1(0.0F);
+        _instance.setAlpha(0.0F);
+        _instance.setDegreeTargetMax(45.0F);
+        _instance.setDegreeTarget(0.0F);
         _instance.setStepMode(step_mode);
         _instance.setStepsPerRevolution(steps_per_revolution);
         _instance.setRpmMax(rpm_max);
@@ -54,7 +54,7 @@ void        STEPPER_ENGINE::setRpmActual(void) {
     }
     
     _rpm_actual = _rpm_min + 3 * _rpm_counter;
-    float velocity = _rpm_actual * _PI / 30.0f;
+    float velocity = _rpm_actual * _PI / 30.0F;
 
     setPrescaler(velocity);
 }
@@ -77,7 +77,7 @@ void        STEPPER_ENGINE::setPrescaler(float velocity) {
         uint8_t  length          = sizeof(arr_prescaler) / sizeof(arr_prescaler[0]);
 
         for (uint8_t i = 0; i < length; i++) {
-            uint32_t ocr_helper = static_cast<uint32_t>(time * F_CPU / arr_prescaler[i] - 1.0);
+            uint32_t ocr_helper = static_cast<uint32_t>(time * F_CPU / arr_prescaler[i] - 1.0F);
             if (ocr_helper < 0xFFFF) {
                 _timer_prescaler = arr_prescaler[i];
                 setOCR(static_cast<uint16_t>(ocr_helper));
@@ -219,7 +219,7 @@ void        STEPPER_ENGINE::setRpmMin(uint16_t rpm_min) {
     stopTimerEngine();
     _rpm_min = rpm_min;
 
-    float velocity = _rpm_min * _PI / 30.0f;
+    float velocity = _rpm_min * _PI / 30.0F;
     setPrescaler(velocity);
     startTimerEngine();
 }
@@ -255,8 +255,8 @@ void        STEPPER_ENGINE::setT1(float t1) {
 
 void STEPPER_ENGINE::setAlpha(float angle) {
     if (_setPosition || isnan (angle)) return;
-    angle > 45.0f ? angle = 45.0f : (angle < -45.0f ? angle = -45.0f : angle = angle);
-    _alpha = getDegreeActual() * _PI / 180.0f;
+    angle > 45.0F ? angle = 45.0F : (angle < -45.0F ? angle = -45.0F : angle = angle);
+    _alpha = getDegreeActual() * _PI / 180.0F;
 
     float error = angle - _alpha;
     setOmega(error);
@@ -265,35 +265,35 @@ void STEPPER_ENGINE::setAlpha(float angle) {
 void        STEPPER_ENGINE::setOmega(float omega) {
     if (_setPosition || isnan (omega)) return; 
 
-    static  float omega_old     = 0.0f;             // old omega value
-            float dt            = 0.002f;           // sample time 
+    static  float omega_old     = 0.0F;             // old omega value
+            float dt            = 0.002F;           // sample time 
             float filter_factor = dt / (_t1 + dt);  // filter factor for P-T1 member
 
     /*      P-T1 Member     */
     _omega = omega_old + (_kp * omega - omega_old) * filter_factor;
 
-    _omega > 15.7f ? _omega = 15.7f : (_omega < -15.7f ? _omega = -15.7f : _omega = _omega);
+    _omega > 15.7F ? _omega = 15.7F : (_omega < -15.7F ? _omega = -15.7F : _omega = _omega);
     omega_old = _omega;
     
-    // 0.039 rad/s min frequency -> PSC:1024 OCR: 0xFFFF | t = 1024 * (0xFFFF + 1) / 16E6
-    if (_omega > 0.0382f) {
+    // 0.0382 rad/s min frequency -> PSC:1024 OCR: 0xFFFF | t = 1024 * (0xFFFF + 1) / 16E6
+    if (_omega > 0.0382F) {
         setDirection(ENGINE_DIRECTION::ccw);
         setPrescaler(_omega);
         if (getState() == false) {
             startTimerEngine();
         }
     }
-    else if (_omega < -0.0382f) {
+    else if (_omega < -0.0382F) {
         setDirection(ENGINE_DIRECTION::cw);
-        setPrescaler(-1.0f * _omega);
+        setPrescaler(-1.0F * _omega);
         if (getState() == false) {
             startTimerEngine();
         }
     }
     else {
-        _omega = 0.0f;
+        _omega = 0.0F;
         setDirection(ENGINE_DIRECTION::undefined);
-        STOP_ENGINE();
+        //STOP_ENGINE();
         stopTimerEngine();
     }
 }
@@ -304,15 +304,15 @@ bool        STEPPER_ENGINE::getState(void) const {
 }
 
 float      STEPPER_ENGINE::getDegreeActual(void) const {
-    return static_cast<float>(_degree_actual / 1000.0);   
+    return static_cast<float>(_degree_actual / 1000.0F);   
 }
 
 float      STEPPER_ENGINE::getDegreeTarget(void) const {
-    return static_cast<float>(_degree_target / 1000.0);
+    return static_cast<float>(_degree_target / 1000.0F);
 }
 
 float      STEPPER_ENGINE::getDegreeTargetMax(void) const {
-    return static_cast<float>(_degree_target_max / 1000.0);
+    return static_cast<float>(_degree_target_max / 1000.0F);
 }
 
 float      STEPPER_ENGINE::getKP(void) const {
@@ -352,7 +352,7 @@ uint16_t    STEPPER_ENGINE::getStepsPerRevolution(void) const {
 }
 
 float       STEPPER_ENGINE::getDegreePerStep(void) const {
-    return static_cast<float>(_degree_per_step / 1000.0);
+    return static_cast<float>(_degree_per_step / 1000.0F);
 }
 
 ENGINE_STEP_MODE        STEPPER_ENGINE::getStepMode(void) const {
@@ -384,7 +384,7 @@ void        STEPPER_ENGINE::begin(void) {
 
     while (CHECK_END_POSITION_LEFT()) {
         setPosition(true);
-        setDegreeTarget(static_cast<float>((_degree_actual + _degree_per_step) / 1000.0));
+        setDegreeTarget(static_cast<float>((_degree_actual + _degree_per_step) / 1000.0F));
         while (_degree_actual != _degree_target) {}
     }
 
@@ -393,7 +393,7 @@ void        STEPPER_ENGINE::begin(void) {
     while (CHECK_END_POSITION_RIGHT()) {
         counter_steps++;
         setPosition(true);
-        setDegreeTarget(static_cast<float>((_degree_actual - _degree_per_step) / 1000.0));
+        setDegreeTarget(static_cast<float>((_degree_actual - _degree_per_step) / 1000.0F));
         while (_degree_actual != _degree_target) {}
     }
 
@@ -401,7 +401,7 @@ void        STEPPER_ENGINE::begin(void) {
 
     for (uint16_t i = 0; i < counter_steps / 2; i++) {
         setPosition(true);
-        setDegreeTarget(static_cast<float>((_degree_actual + _degree_per_step) / 1000.0));
+        setDegreeTarget(static_cast<float>((_degree_actual + _degree_per_step) / 1000.0F));
         while (_degree_actual != _degree_target) {}
     }
 
@@ -411,12 +411,12 @@ void        STEPPER_ENGINE::begin(void) {
     setDegreeTargetMax(degree_max_local);
     setRpmMax(rpm_max_local);
     setDegreeActual(true);
-    setAlpha(0.0);
+    setAlpha(0.0F);
     Serial.println("Finished initialization!");
 }
 
 void        STEPPER_ENGINE::stop(void) {
-    setDegreeTarget(0.0);
+    setDegreeTarget(0.0F);
 
     while (getState()) {};
 
