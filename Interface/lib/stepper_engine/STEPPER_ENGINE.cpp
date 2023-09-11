@@ -1,13 +1,11 @@
 #include "STEPPER_ENGINE.h"
-#include "avr8-stub.h"
-#include "app_api.h"  //only needed with flash breakpoints
 
 /*      CONSTRUCTORS        */
 
 STEPPER_ENGINE& STEPPER_ENGINE::getInstance(ENGINE_STEP_MODE step_mode, uint16_t rpm_min, uint16_t rpm_max, uint16_t steps_per_revolution) {
     static STEPPER_ENGINE _instance;
 
-    if (_instanceCreated == false) {
+    if (_instanceStepperCreated == false) {
         _instance.setPosition(true);
         _instance.setKP(0.0F);
         _instance.setKD(0.0F);
@@ -20,7 +18,7 @@ STEPPER_ENGINE& STEPPER_ENGINE::getInstance(ENGINE_STEP_MODE step_mode, uint16_t
         _instance.setRpmMax(rpm_max);
         _instance.setRpmMin(rpm_min);
 
-        _instanceCreated = true;
+        _instanceStepperCreated = true;
     }
     return _instance;     
 }
@@ -157,7 +155,7 @@ void        STEPPER_ENGINE::stopTimerEngine(void) {
 }
 
 void        STEPPER_ENGINE::isrMoveEngine(void) {
-    if (STEPPER_ENGINE::_instanceCreated) {
+    if (STEPPER_ENGINE::_instanceStepperCreated) {
         STEPPER_ENGINE& _instance = STEPPER_ENGINE::getInstance();
         if (_instance._setPosition == false) {
             _instance.setDegreeActual();

@@ -13,7 +13,7 @@ class TOF {
                         uint16_t    _distance;
                         uint8_t     _stop_variable;
 
-        VL53L0X sensor_obj;
+        VL53L0X sensor;
         STEPPER_ENGINE& stepper = STEPPER_ENGINE::getInstance();
 
         void setOffset(void);
@@ -34,11 +34,14 @@ class TOF {
 
         /*      GETTER      */
         uint8_t  getBallRadius(void) const;
-        uint16_t getDistance(void);
+        uint8_t  getOffset(void) const;
 
         /*      FUNCTIONALITY       */
-        bool beginTof(void);
-        float getDistanceSimulink(void);
+        uint16_t getDistance(void);
+        uint16_t getDistancePure(void);
+        float   getDistanceSimulink(void);
+
+        bool    beginTof(void);
 };
 
 #endif

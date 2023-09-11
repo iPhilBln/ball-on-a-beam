@@ -4,6 +4,10 @@ INTERFACE& INTERFACE::getInstance(uint8_t ball_radius) {
     static INTERFACE _instance;
 
     if (_instanceInterfaceCreated == false) {
+        _instance.tof        = &TOF::getInstance(ball_radius);
+        _instance.ultrasonic = &HC_SR04::getInstance(ball_radius);
+        _instance.stepper    = &STEPPER_ENGINE::getInstance();
+
         _instance.setSensor(SENSOR::UNDEFINED);
         _instanceInterfaceCreated = true;
     }
@@ -26,20 +30,21 @@ void INTERFACE::run(void) {
         FLOATUNION_t val_transmit;
         FLOATUNION_t val_receive;
 
-        val_transmit.number[0] = stepper.getOmega();
-        val_transmit.number[1] = stepper.getAlpha();
+        val_transmit.number[0] = stepper->getOmega();
+        val_transmit.number[1] = stepper->getAlpha();
 
         switch(getSensor()) {
-            case SENSOR::ULTRASONIC :   val_transmit.number[2] = ultrasonic.getDistanceSimulink();  break;
-            case SENSOR::TOF        :   val_transmit.number[2] = tof.getDistanceSimulink();         break;
-            case SENSOR::RESISTOR   :   val_transmit.number[2] = 0; break;
+            case SENSOR::ULTRASONIC :   val_transmit.number[2] = ultrasonic->getDistanceSimulink();  break;
+            case SENSOR::TOF        :   val_transmit.number[2] = tof->getDistanceSimulink();         break;
+            case SENSOR::RESISTOR   :   val_transmit.number[2] = 0.0; break;
+            default                 :   val_transmit.number[2] = 0.0;
         }
 
         val_receive = communicationSimulink(val_transmit);
 
-        stepper.setKP(val_receive.number[0]);
-        stepper.setT1(val_receive.number[1]);
-        stepper.setAlpha(val_receive.number[2]);
+        stepper->setKP(val_receive.number[0]);
+        stepper->setT1(val_receive.number[1]);
+        stepper->setAlpha(val_receive.number[2]);
         
         if (_SELECT_SENSOR_ULTRASONIC())    setSensor(SENSOR::ULTRASONIC);
         else if (_SELECT_SENSOR_TOF())      setSensor(SENSOR::TOF);
@@ -74,8 +79,8 @@ void INTERFACE::selectSensor(void) {
 
 void INTERFACE::initSensor(void) {
     switch(getSensor()) {
-        case SENSOR::ULTRASONIC :   ultrasonic.beginUltrasonic();  break;
-        case SENSOR::TOF        :   tof.beginTof();                break;
+        case SENSOR::ULTRASONIC :   ultrasonic->beginUltrasonic();  break;
+        case SENSOR::TOF        :   tof->beginTof();                break;
         case SENSOR::RESISTOR   :   while (true) {}; break;
     }
 }
@@ -120,7 +125,7 @@ void INTERFACE::begin(void) {
     _SERIAL0_SETUP();
     _SERIAL1_SETUP();
 
-    stepper.begin();
+    stepper->begin();
 
     while (true) {
         selectSensor();
@@ -132,7 +137,7 @@ void INTERFACE::begin(void) {
 
 void INTERFACE::stop(void) {
     _SLAVE_DISABLE();
-    stepper.stop();
+    stepper->stop();
     stopTimer();
 }
 

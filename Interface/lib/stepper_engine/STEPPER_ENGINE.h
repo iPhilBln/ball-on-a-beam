@@ -8,7 +8,7 @@
     * end position left  = D28 / A6
     * end position right = D29 / A7
     */
-   
+
     #define SET_GPIO_DIRECTION_END_POSITON_PUSHBUTTON() DDRA &= ~( _BV(PA6) | _BV(PA7) ); PORTA |= _BV(PA6) | _BV(PA7)  // set D06 and D07 as INPUT and activate internal Pull-Up resistor
     #define CHECK_END_POSITION_LEFT()   (PINA & _BV(PA6))  // check if D06 is HIGH == TRUE -> no end position detected | LOW == FALSE -> end position is detected
     #define CHECK_END_POSITION_RIGHT()  (PINA & _BV(PA7))  // check if D07 is HIGH == TRUE -> no end position detected | LOW == FALSE -> end position is detected
@@ -55,7 +55,7 @@
     };
     class STEPPER_ENGINE {
         private:               
-            inline  static  bool  _instanceCreated = false;
+            inline  static  bool  _instanceStepperCreated = false;
 
             volatile    ENGINE_DIRECTION _direction; 
                         int32_t          _degree_target;
@@ -118,7 +118,6 @@
             void    setKP(float p_part);
             void    setKD(float d_part);
             void    setT1(float t1);
-            void    setDT(void);
             void    setAlpha(float angle);
             void    setOmega(float omega);
             

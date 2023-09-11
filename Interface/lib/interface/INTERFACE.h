@@ -37,7 +37,6 @@
 
             volatile    bool    _running;
                         SENSOR  _sensor;
-                        uint8_t _ball_radius;
 
             void run(void);
             void selectSensor(void);
@@ -46,9 +45,9 @@
             void startTimer(void);
             void stopTimer(void);
 
-            TOF&            tof         = TOF::getInstance();
-            HC_SR04&        ultrasonic  = HC_SR04::getInstance();
-            STEPPER_ENGINE& stepper     = STEPPER_ENGINE::getInstance();    
+            TOF*            tof;
+            HC_SR04*        ultrasonic;
+            STEPPER_ENGINE* stepper;     
 
             static  void    isrCycletime(void)  __asm__("__vector_13") __attribute__((__signal__, __used__, __externally_visible__)); // Timer/Counter2 Compare Match A 
             
@@ -60,7 +59,7 @@
             INTERFACE& operator = (const INTERFACE&) = delete;
 
         public:
-            static INTERFACE& getInstance(uint8_t ball_radius);
+            static INTERFACE& getInstance(uint8_t ball_radius = 20);
 
             // SETTER
             void setSensor(SENSOR sensor);
