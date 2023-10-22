@@ -2,21 +2,24 @@
 
 /*      CONSTRUCTORS        */
 
-STEPPER_ENGINE& STEPPER_ENGINE::getInstance(ENGINE_STEP_MODE step_mode, uint16_t rpm_min, uint16_t rpm_max, uint16_t steps_per_revolution) {
+STEPPER_ENGINE& STEPPER_ENGINE::getInstance(float dt, ENGINE_STEP_MODE step_mode, uint16_t rpm_min, uint16_t rpm_max, uint16_t steps_per_revolution) {
     static STEPPER_ENGINE _instance;
 
     if (_instanceStepperCreated == false) {
         _instance.setPosition(true);
-        _instance.setKP(0.0F);
+        _instance.setPwm(false);
+        _instance.setT1(0.1F);
+        _instance.setDT(dt);
+        _instance.setKP(1.0F);
         _instance.setKD(0.0F);
-        _instance.setT1(0.0F);
-        _instance.setAlpha(0.0F);
         _instance.setDegreeTargetMax(45.0F);
         _instance.setDegreeTarget(0.0F);
         _instance.setStepMode(step_mode);
         _instance.setStepsPerRevolution(steps_per_revolution);
         _instance.setRpmMax(rpm_max);
         _instance.setRpmMin(rpm_min);
+
+        _instance.pid = new PIDController(_instance._kp, _instance._ki, _instance._kd, _instance._dt, -10.7F, 10.7F);
 
         _instanceStepperCreated = true;
     }
@@ -89,7 +92,16 @@ void STEPPER_ENGINE::setOCR(uint16_t ocr) {
 }
 
 void STEPPER_ENGINE::setPosition(bool setPosition) {
+    if (_enablePwm) {
+        stopTimerEngine();
+        setPwm(false);
+    }
+
     _setPosition = setPosition;
+}
+
+void STEPPER_ENGINE::setPwm(bool enablePwm) {
+    _enablePwm = enablePwm;
 }
 
 void        STEPPER_ENGINE::move(void) {
@@ -134,6 +146,30 @@ void        STEPPER_ENGINE::move(void) {
     }
 }  
 
+void        STEPPER_ENGINE::hold(void) {
+    static bool hold_helper = false;
+
+    if(hold_helper) {
+        switch (_step_counter) {
+            case 0: H_L1CW_L2CCW();  break; 
+            case 1: H_L1CW_L2OFF();  break; 
+            case 2: H_L1CW_L2CW();   break;   
+            case 3: H_L1OFF_L2CW();  break; 
+            case 4: H_L1CCW_L2CW();  break; 
+            case 5: H_L1CCW_L2OFF(); break;    
+            case 6: H_L1CCW_L2CCW(); break;    
+            case 7: H_L1OFF_L2CCW(); break;    
+            default: break;
+        }
+
+        hold_helper = false;
+    }
+    else {
+        STOP_ENGINE();
+        hold_helper = true;
+    }
+}
+
 void        STEPPER_ENGINE::startTimerEngine(void) {
     stopTimerEngine();
     OCR1A = _ocr;
@@ -158,9 +194,15 @@ void        STEPPER_ENGINE::isrMoveEngine(void) {
     if (STEPPER_ENGINE::_instanceStepperCreated) {
         STEPPER_ENGINE& _instance = STEPPER_ENGINE::getInstance();
         if (_instance._setPosition == false) {
-            _instance.setDegreeActual();
-            _instance.move();
-            _instance.startTimerEngine();
+            if (_instance._enablePwm) {
+                _instance.hold();
+                _instance.startTimerEngine();
+            }
+            else {
+                _instance.setDegreeActual();
+                _instance.move();
+                _instance.startTimerEngine();
+            }
         }
         else {     
             if (_instance._degree_actual < (_instance._degree_target - _instance._degree_per_step / 2)) {
@@ -205,7 +247,7 @@ void        STEPPER_ENGINE::setDegreeTarget(float degree_target) {
     if (degree_target_local > _degree_target_max)           _degree_target = _degree_target_max;
     else if (degree_target_local < - _degree_target_max)    _degree_target = - _degree_target_max;
     else                                                    _degree_target = degree_target_local;
-    
+
     if (getState() == false) {
         startTimerEngine();
     }
@@ -237,62 +279,125 @@ void        STEPPER_ENGINE::setStepsPerRevolution(uint16_t steps_per_revolution)
 }
 
 void        STEPPER_ENGINE::setKP(float kp) {
-    if (isnan(kp)) return;
+    if (isnan(kp) || kp == 0.0F) return;
     _kp = kp;
+    pid->setKP(_kp);
 }
 
 void        STEPPER_ENGINE::setKD(float kd) {
     if (isnan(kd)) return;
     _kd = kd;
+    if (_kp != 0.0F && _kd != 0.0F) {
+        float ti = 10.0F * _kd / _kp;
+        _ki = _kp / ti;
+        //pid->setKI(_ki);
+    }  
+    pid->setKD(_kd);
 }
 
 void        STEPPER_ENGINE::setT1(float t1) {
-    if (isnan(t1)) return;
+    if (isnan(t1) || t1 == 0.0F) return;
     _t1 = t1;
+}
+
+void        STEPPER_ENGINE::setDT(float dt) {
+    if (isnan(dt) || dt == 0.0F) return;
+    _dt = dt;
 }
 
 void STEPPER_ENGINE::setAlpha(float angle) {
     if (_setPosition || isnan (angle)) return;
-    angle > 45.0F ? angle = 45.0F : (angle < -45.0F ? angle = -45.0F : angle = angle);
+    //angle > 0.7853982F ? angle = 0.7853982F : (angle < -0.7853982F ? angle = -0.7853982F : angle = angle); // -45° <= alpha <= 45°
     _alpha = getDegreeActual() * _PI / 180.0F;
 
-    float error = angle - _alpha;
-    setOmega(error);
+    // check if alpha < abs(0.45°)
+    if (fabs(_alpha - angle) <= 0.007853982F) {
+        _alpha = angle;
+    }
+
+    pid->setPID(angle, _alpha);
+    setOmega(pid->getPID());
+
+    //float error = angle - _alpha;
+    //setPID(error);
+}
+
+void STEPPER_ENGINE::setPID(float error) {
+    if (_setPosition || isnan (error)) return; 
+
+            //float       i_helper  = _i_part;
+            float       pid_omega = 0.0F;
+    static  float       error_old = error;
+
+
+    _p_part  = _kp * error;
+    //_i_part  = _i_part + _ki * error * _dt;
+    _d_part  = _kd * (error - error_old) / _dt;
+    error_old = error;
+
+    /*
+    // anti wind-up
+    if (_i_part > 10.7F)           _i_part = 10.7F;
+    else if ( _i_part < -10.7F)    _i_part = -10.7F;
+    */
+
+    
+    //pid_omega = _p_part + _i_part + _d_part;
+    pid_omega = _p_part + _d_part;
+
+
+    setOmega(pid_omega);
 }
 
 void        STEPPER_ENGINE::setOmega(float omega) {
     if (_setPosition || isnan (omega)) return; 
+            float filter_factor = _dt / (_t1 + _dt);                // filter factor for P-T1 member
+            uint16_t timer_prescaler_helper = _timer_prescaler;     // helper to compute delay difference
+    static  float omega_old     = 0.0F;                             // old omega value
 
-    static  float omega_old     = 0.0F;             // old omega value
-            float dt            = 0.002F;           // sample time 
-            float filter_factor = dt / (_t1 + dt);  // filter factor for P-T1 member
+    omega > 10.7F ? omega = 10.7F : (omega < -10.7F ? omega = -10.7F : omega = omega);
 
     /*      P-T1 Member     */
-    _omega = omega_old + (_kp * omega - omega_old) * filter_factor;
-
-    _omega > 15.7F ? _omega = 15.7F : (_omega < -15.7F ? _omega = -15.7F : _omega = _omega);
+    _omega = omega_old + (omega - omega_old) * filter_factor;
     omega_old = _omega;
-    
+
     // 0.0382 rad/s min frequency -> PSC:1024 OCR: 0xFFFF | t = 1024 * (0xFFFF + 1) / 16E6
     if (_omega > 0.0382F) {
         setDirection(ENGINE_DIRECTION::ccw);
         setPrescaler(_omega);
-        if (getState() == false) {
+        setPwm(false);
+
+        uint16_t cnt_helper = OCR1A - TCNT1;
+
+        float delay_old = 1.0F * (cnt_helper + 1U) * timer_prescaler_helper / F_CPU;
+        float delay_new = 1.0F * (_ocr + 1U) * _timer_prescaler / F_CPU;
+
+        if (delay_new < delay_old || getState() == false) {
             startTimerEngine();
         }
     }
     else if (_omega < -0.0382F) {
         setDirection(ENGINE_DIRECTION::cw);
         setPrescaler(-1.0F * _omega);
-        if (getState() == false) {
+        setPwm(false);
+
+        uint16_t cnt_helper = OCR1A - TCNT1;
+
+        float delay_old = 1.0F * (cnt_helper + 1U) * timer_prescaler_helper / F_CPU;
+        float delay_new = 1.0F * (_ocr + 1U) * _timer_prescaler / F_CPU;
+
+        if (delay_new < delay_old || getState() == false) {
             startTimerEngine();
         }
     }
     else {
         _omega = 0.0F;
         setDirection(ENGINE_DIRECTION::undefined);
-        //STOP_ENGINE();
-        stopTimerEngine();
+        setPrescaler(50000.0F * 2 * PI / _steps_per_revolution);   // 50kHz PWM frequency and 50% dutycycle
+        setPwm(true);
+        if (getState() == false) {
+            startTimerEngine();
+        }
     }
 }
 
@@ -323,6 +428,10 @@ float      STEPPER_ENGINE::getKD(void) const {
 
 float      STEPPER_ENGINE::getT1(void) const {
     return _t1;
+}
+
+float      STEPPER_ENGINE::getDT(void) const {
+    return _dt;
 }
 
 float      STEPPER_ENGINE::getAlpha(void) const {
@@ -357,7 +466,7 @@ ENGINE_STEP_MODE        STEPPER_ENGINE::getStepMode(void) const {
     return _step_mode;
 }
 
-void        STEPPER_ENGINE::begin(void) {
+bool        STEPPER_ENGINE::begin(void) {
 
     SET_GPIO_DIRECTION_END_POSITON_PUSHBUTTON();
     SET_GPIO_DIRECTION_ENGINE();
@@ -379,8 +488,12 @@ void        STEPPER_ENGINE::begin(void) {
 
     setDegreeActual(true);
     startTimerEngine();
-
+    
     while (CHECK_END_POSITION_LEFT()) {
+        if (getDegreeActual() > 250.0F) {
+            STOP_ENGINE();
+            return false;
+        }
         setPosition(true);
         setDegreeTarget(static_cast<float>((_degree_actual + _degree_per_step) / 1000.0F));
         while (_degree_actual != _degree_target) {}
@@ -389,6 +502,10 @@ void        STEPPER_ENGINE::begin(void) {
     while (getState()) {}
 
     while (CHECK_END_POSITION_RIGHT()) {
+        if (getDegreeActual() < -250.0F) {
+            STOP_ENGINE();
+            return false;
+        }
         counter_steps++;
         setPosition(true);
         setDegreeTarget(static_cast<float>((_degree_actual - _degree_per_step) / 1000.0F));
@@ -409,16 +526,20 @@ void        STEPPER_ENGINE::begin(void) {
     setDegreeTargetMax(degree_max_local);
     setRpmMax(rpm_max_local);
     setDegreeActual(true);
-    setAlpha(0.0F);
-    Serial.println("Finished initialization!");
+    setAlpha(0.0F); 
+
+    Serial.println("Initialization for stepper engine completed.");
+    return true;
 }
 
 void        STEPPER_ENGINE::stop(void) {
-    setDegreeTarget(0.0F);
-
-    while (getState()) {};
-
-    Serial.println("Finish");
+    if (getDegreeActual() != 0.0F) {
+        setDegreeTarget(0.0F);
+        while (getState()) {};
+    }
+    STOP_ENGINE();
+    stopTimerEngine();
+    Serial.println("Stepper engine has been stopped.");
 }
 
 

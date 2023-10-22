@@ -2,6 +2,7 @@
 #define SIMULINK_INTERFACE_H_
 
   #include <Arduino.h>
+  #include "INTERFACE.h"
 
   #define  _SERIAL0_SETUP() DDRE &= ~( _BV(PE0) ); DDRE |= _BV(PE1); PORTE |= _BV(PE1) | _BV(PE0); // enable Pull-Up -> prevent crosstalk
   #define  _SERIAL1_SETUP() DDRD &= ~( _BV(PD2) ); DDRD |= _BV(PD3); PORTD |= _BV(PD3) | _BV(PD2); // enable Pull-Up -> prevent crosstalk
@@ -15,6 +16,8 @@
     byte  buffer[12];
   } FLOATUNION_t;
 
-  FLOATUNION_t communicationSimulink(FLOATUNION_t val);
+  FLOATUNION_t communicationSimulink(FLOATUNION_t val_transmit);
+  FLOATUNION_t communicationSimulinkNew(FLOATUNION_t val_transmit);
+  bool         communicationSimulinkSync(FLOATUNION_t val_transmit, bool init_serial1);
 
 #endif

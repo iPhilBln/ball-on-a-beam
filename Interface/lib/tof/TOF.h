@@ -12,11 +12,11 @@ class TOF {
                         uint8_t     _offset;
                         uint16_t    _distance;
                         uint8_t     _stop_variable;
+                        uint8_t     _measurement_failed;
 
         VL53L0X sensor;
-        STEPPER_ENGINE& stepper = STEPPER_ENGINE::getInstance();
 
-        void setOffset(void);
+        bool setOffset(void);
         void startMeasurement(void);
 
         // Meyers Singleton Constructor
@@ -39,7 +39,7 @@ class TOF {
         /*      FUNCTIONALITY       */
         uint16_t getDistance(void);
         uint16_t getDistancePure(void);
-        float   getDistanceSimulink(void);
+        float    getDistanceSimulink(void);
 
         bool    beginTof(void);
 };

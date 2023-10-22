@@ -1,6 +1,7 @@
 #ifndef STEPPER_ENGINE_H_INCLUDED
 #define STEPPER_ENGINE_H_INCLUDED
     #include <Arduino.h>
+    #include "pid.h"
 
     #define _PI 3.1415926535f
 
@@ -73,16 +74,24 @@
             volatile    uint8_t          _step_counter;
 
                         bool             _setPosition;
+                        bool             _enablePwm;
                         uint16_t         _ocr;
 
                         float            _kp;
                         float            _kd;
+                        float            _ki;
                         float            _t1;
                         float            _dt;
                         float            _omega;
                         float            _alpha;
 
-                    //void    setDegreeActual(bool reset = false);
+                        float            _p_part;
+                        float            _i_part;
+                        float            _d_part;
+
+                        PIDController    *pid;
+
+                    void    setDegreeActual(bool reset = false);
                     void    setRpmActual(void);
                     void    setDegreePerStep(uint16_t steps_per_revolution);
                     void    setStepMode(ENGINE_STEP_MODE step_mode);
@@ -90,8 +99,11 @@
                     void    setPrescaler(float velocity = 0.0);
                     void    setOCR(uint16_t ocr);
                     void    setPosition(bool setPosition);
+                    void    setPwm(bool enablePwm);
+                    void    setPID(float error);
                     
-                    void    move(void);       
+                    void    move(void);  
+                    void    hold(void);     
                     void    startTimerEngine(void);
                     void    stopTimerEngine(void); 
                     //void    computeFreq(void);
@@ -100,24 +112,23 @@
             
             // Meyers Singleton Constructor
             STEPPER_ENGINE() {}
-            ~STEPPER_ENGINE() {}
+            ~STEPPER_ENGINE() { delete pid; pid = nullptr; }
             
             STEPPER_ENGINE(const STEPPER_ENGINE&) = delete;
             STEPPER_ENGINE& operator = (const STEPPER_ENGINE&) = delete;
         public:
-            static STEPPER_ENGINE& getInstance(ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 3, uint16_t rpm_max = 50, uint16_t steps_per_revolution = 200);
+            static STEPPER_ENGINE& getInstance(float dt = 0.075F, ENGINE_STEP_MODE step_mode = ENGINE_STEP_MODE::halfstep, uint16_t rpm_min = 3, uint16_t rpm_max = 50, uint16_t steps_per_revolution = 200);
 
             // SETTER
-            void    setDegreeActual(bool reset = false); //testen
-
             void    setDegreeTargetMax(float degree_target_max);
             void    setDegreeTarget(float degree_target);
             void    setRpmMin(uint16_t rpm_min);
             void    setRpmMax(uint16_t rpm_max);
             void    setStepsPerRevolution(uint16_t steps_per_revolution);
-            void    setKP(float p_part);
-            void    setKD(float d_part);
+            void    setKP(float kp);
+            void    setKD(float td);
             void    setT1(float t1);
+            void    setDT(float dt);
             void    setAlpha(float angle);
             void    setOmega(float omega);
             
@@ -129,6 +140,7 @@
             float               getKP(void) const;
             float               getKD(void) const;
             float               getT1(void) const;
+            float               getDT(void) const;
             float               getAlpha(void) const;
             float               getOmega(void) const;
             uint16_t            getRpmActual(void) const;
@@ -139,7 +151,7 @@
             ENGINE_STEP_MODE    getStepMode(void) const;
 
             // FUNCTIONS
-            void        begin(void);
+            bool        begin(void);
             void        stop(void);
     };
 #endif

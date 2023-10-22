@@ -28,13 +28,12 @@
             volatile    uint16_t    _echo_counter;
             volatile    bool        _echo_timeout;
             volatile    bool        _measurement_completed;
-
+                        uint8_t     _measurement_failed;
+                        
                         uint8_t     _offset;
                         uint16_t    _distance;
 
-            STEPPER_ENGINE& stepper = STEPPER_ENGINE::getInstance();
-
-                    void    setOffset(void);
+                    bool    setOffset(void);
 
                     void    setUltrasonicSpeed(double temperature);
 
@@ -43,7 +42,7 @@
                     void    stopTimerEcho(void);
 
             static  void    isrEchoCapture(void)  __asm__("__vector_41") __attribute__((__signal__, __used__, __externally_visible__)); // Timer/Counter4 Capture Event
-            static  void    isrEchoTimeout(void)  __asm__("__vector_42") __attribute__((__signal__, __used__, __externally_visible__)); // Timer/Counter4 Compare Match A              
+            static  void    isrEchoTimeout(void)  __asm__("__vector_45") __attribute__((__signal__, __used__, __externally_visible__)); // Timer/Counter4 Timer Overflow Vector             
 
             // Meyers Singleton Constructor
             HC_SR04() {}
@@ -53,11 +52,11 @@
             HC_SR04& operator = (const HC_SR04&) = delete;            
         
         public:
-            static HC_SR04& getInstance(uint8_t ball_radius = 20, double  temperature = 20.0f);
+            static HC_SR04& getInstance(uint8_t ball_radius = 20);
             
             /*      SETTER      */
             void    setBallRadius(uint8_t ball_radius);
-            void    setTemperature(double temperature);
+            void    setTemperature(void);
             
             /*      GETTER      */
             uint8_t getBallRadius(void) const;

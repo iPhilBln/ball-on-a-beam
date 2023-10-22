@@ -28,19 +28,24 @@
         ULTRASONIC,
         TOF,
         RESISTOR,
-        UNDEFINED
+        UNDEFINED,
+        AUTO
     };
 
     class INTERFACE {
         private:
             inline static bool  _instanceInterfaceCreated = false;
 
-            volatile    bool    _running;
-                        SENSOR  _sensor;
+            volatile    bool        _running;
+                        SENSOR      _sensor;
+                        uint16_t    _prescaler;
+                        float       _sample_time;
+                        uint8_t     _max_TCNT;
 
             void run(void);
             void selectSensor(void);
-            void initSensor(void);
+            bool initSensor(void);
+            void setSampleTime(float sample_time);
 
             void startTimer(void);
             void stopTimer(void);
@@ -53,19 +58,21 @@
             
             // Meyers Singleton Constructor
             INTERFACE() {}
-            ~INTERFACE() {}
+            ~INTERFACE() {  delete &tof; delete &ultrasonic; delete &stepper; }
+            //~INTERFACE() {  delete &tof; delete &ultrasonic;}
             
             INTERFACE(const INTERFACE&) = delete;
             INTERFACE& operator = (const INTERFACE&) = delete;
 
         public:
-            static INTERFACE& getInstance(uint8_t ball_radius = 20);
+            static INTERFACE& getInstance(uint8_t ball_radius = 20, float sample_time = 7.5F);
 
             // SETTER
             void setSensor(SENSOR sensor);
 
             // GETTER
             SENSOR getSensor(void) const;
+            float  getSampleTime(void) const;
 
             // FUNCTIONS
             void begin(void);

@@ -55,15 +55,9 @@ void loop(void) {
     // Output as csv format
     Serial.print("\"measurement\";");
     Serial.print("\"distance_soll\";");
-    Serial.print("\"distance_left\";");
-    Serial.print("\"distance_right\";");
-    Serial.print("\"first half per sensor\";");
-    Serial.print("\"last half per sensor\";");
-    Serial.print("\"linear regression only left\";");
-    Serial.print("\"lear regression both\"");
-    Serial.print("\"average\"");
-    Serial.print("\"minimum\"");
-    Serial.print("\"maximum\"");
+    Serial.print("\"distance_us\";");
+    Serial.print("\"distance_tof\"");
+
     Serial.println();
 
 
